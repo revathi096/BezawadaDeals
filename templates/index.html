@@ -1,234 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>BezawadaDeals | Vijayawada Local Shopping</title>
-    <meta name="description" content="Explore Vijayawada shops, local markets and live price comparisons area-wise.">
-
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: Arial, sans-serif;
-        }
-
-        body {
-            background: #f5f8f5;
-            color: #222;
-        }
-
-        header {
-            background: #087443;
-            color: white;
-            padding: 18px 5%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-
-        header h2 { font-size: 23px; }
-
-        nav a {
-            color: white;
-            text-decoration: none;
-            margin: 8px;
-            font-weight: bold;
-        }
-
-        .hero {
-            text-align: center;
-            padding: 55px 15px;
-            background: linear-gradient(120deg, #087443, #20a66b);
-            color: white;
-        }
-
-        .hero h1 {
-            font-size: 32px;
-            margin-bottom: 12px;
-        }
-
-        .hero p { margin-bottom: 20px; }
-
-        .search {
-            max-width: 550px;
-            margin: auto;
-            display: flex;
-            gap: 8px;
-        }
-
-        input, select, button {
-            padding: 13px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 15px;
-        }
-
-        .search input { flex: 1; min-width: 0; }
-
-        button {
-            background: #ffb300;
-            border: none;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        section { padding: 30px 5%; }
-
-        .section-title {
-            text-align: center;
-            margin-bottom: 22px;
-            color: #087443;
-        }
-
-        .ward-box {
-            max-width: 650px;
-            margin: auto;
-            background: white;
-            padding: 22px;
-            border-radius: 12px;
-            box-shadow: 0 3px 12px #00000010;
-        }
-
-        .ward-box select {
-            width: 100%;
-            margin-top: 12px;
-        }
-
-        #wardMessage {
-            margin-top: 12px;
-            color: #087443;
-        }
-
-        .category-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
-            gap: 15px;
-        }
-
-        .category-card {
-            background: white;
-            border-radius: 12px;
-            padding: 22px 10px;
-            text-align: center;
-            box-shadow: 0 3px 12px #00000010;
-            cursor: pointer;
-            border: 1px solid #e5eee8;
-            font-weight: bold;
-        }
-
-        .category-card:hover {
-            background: #e7f7ed;
-            transform: translateY(-3px);
-        }
-
-        .category-card span {
-            display: block;
-            font-size: 32px;
-            margin-bottom: 10px;
-        }
-
-        #results {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            min-height: 90px;
-        }
-
-        footer {
-            background: #075b36;
-            color: white;
-            text-align: center;
-            padding: 22px;
-            margin-top: 25px;
-        }
-
-        @media(max-width:600px) {
-            header { justify-content: center; text-align: center; }
-            .hero h1 { font-size: 25px; }
-            .search { flex-direction: column; }
-        }
-    </style>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BezawadaDeals | Vijayawada Local Shopping</title>
+<meta name="description" content="Find Vijayawada shops, products, verified prices, offers and map locations area-wise.">
+<style>
+:root{--green:#087443;--green2:#20a66b;--bg:#f5f8f5;--ink:#202820;--muted:#65736a;--line:#e1eae4;--gold:#ffb300}
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}body{background:var(--bg);color:var(--ink);line-height:1.5}header{background:var(--green);color:#fff;padding:15px 5%;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}header h2{font-size:23px}nav{display:flex;gap:15px;align-items:center;flex-wrap:wrap}nav a{color:#fff;text-decoration:none;font-weight:700}.lang{padding:9px 11px;border:0;border-radius:8px;background:#fff;color:var(--green);font-weight:700}.hero{text-align:center;padding:48px 15px;background:linear-gradient(120deg,var(--green),var(--green2));color:white}.hero h1{font-size:clamp(25px,4vw,36px);margin-bottom:9px}.hero p{margin-bottom:20px}.search{max-width:650px;margin:auto;display:flex;gap:8px}.search input{flex:1;min-width:0}input,select,button{padding:12px;border:1px solid #d8e1da;border-radius:8px;font-size:15px}button{cursor:pointer;font-weight:700}.primary{background:var(--gold);border:0;color:#222}.section{padding:30px 5%}.title{text-align:center;color:var(--green);margin-bottom:20px}.panel{max-width:900px;margin:auto;background:#fff;padding:20px;border-radius:13px;box-shadow:0 3px 14px #0000000c}.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}.filters label{display:block;font-weight:700;margin-bottom:6px}.filters select{width:100%;background:#fff}.hint{color:var(--muted);font-size:13px;margin-top:10px}.category-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px}.category{background:#fff;border:1px solid var(--line);border-radius:12px;padding:15px 10px;text-align:center;font-weight:700;cursor:pointer;min-height:94px}.category span{display:block;font-size:28px;margin-bottom:5px}.category.active,.category:hover{background:#e7f7ed;border-color:var(--green)}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}.toolbar select{background:#fff}.shops{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:15px}.shop{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}.shop img{width:100%;height:155px;object-fit:cover;background:#edf2ee}.shopbody{padding:14px}.shop h3{color:var(--green);margin-bottom:5px}.muted{color:var(--muted);font-size:13px}.price{font-size:19px;font-weight:800;margin:8px 0}.live{color:#087443;font-size:12px;font-weight:700}.maplink{display:inline-block;margin-top:8px;color:#075b36;font-weight:700}.empty{background:#fff;padding:22px;border-radius:10px;text-align:center;color:var(--muted)}.status{margin:10px 0;color:var(--muted);font-size:13px}footer{background:#075b36;color:#fff;text-align:center;padding:22px;margin-top:25px}#mapFrame{width:100%;height:340px;border:0;border-radius:12px;background:#e9efea}#mapNote{margin:8px 0;color:var(--muted);font-size:13px}.hidden{display:none!important}@media(max-width:620px){header{justify-content:center;text-align:center}.search{flex-direction:column}.section{padding:25px 4%}nav{justify-content:center}}
+</style>
 </head>
-
 <body>
-
-<header>
-    <h2>🛍️ BezawadaDeals</h2>
-    <nav>
-        <a href="/">Home</a>
-        <a href="#wards">Select Area</a>
-        <a href="#categories">Categories</a>
-        <a href="#offers">Price Tracker</a>
-    </nav>
-</header>
-
-<div class="hero">
-    <h1>Vijayawada Shopping Made Easy!</h1>
-    <p>Find nearby shops and compare prices in your area.</p>
-
-    <div class="search">
-        <input id="searchInput" type="text"
-               placeholder="Search products or shops...">
-        <button onclick="searchItems()">Search</button>
-    </div>
-</div>
-
-<section id="wards">
-    <h2 class="section-title">📍 Select Your Area</h2>
-
-    <div class="ward-box">
-        <label for="wardSelect"><b>Choose your Vijayawada Ward / Area</b></label>
-
-        <select id="wardSelect" onchange="selectWard()">
-            <option value="">Loading ward details...</option>
-        </select>
-
-        <p id="wardMessage">Loading ward data...</p>
-    </div>
-</section>
-
-<section id="categories">
-    <h2 class="section-title">Explore Categories</h2>
-
-    <div class="category-grid">
-        <div class="category-card" onclick="showCategory('Vegetables')"><span>🥦</span>Vegetables</div>
-        <div class="category-card" onclick="showCategory('Fruits')"><span>🍎</span>Fruits</div>
-        <div class="category-card" onclick="showCategory('Groceries')"><span>🛒</span>Groceries</div>
-        <div class="category-card" onclick="showCategory('Supermarkets')"><span>🏬</span>Supermarkets</div>
-        <div class="category-card" onclick="showCategory('Shopping Malls')"><span>🛍️</span>Shopping Malls</div>
-        <div class="category-card" onclick="showCategory('Restaurants')"><span>🍽️</span>Restaurants</div>
-        <div class="category-card" onclick="showCategory('Electronics')"><span>📱</span>Electronics</div>
-        <div class="category-card" onclick="showCategory('Fashion')"><span>👗</span>Fashion</div>
-        <div class="category-card" onclick="showCategory('Accessories')"><span>⌚</span>Accessories</div>
-        <div class="category-card" onclick="showCategory('Medical Stores')"><span>💊</span>Medical Stores</div>
-        <div class="category-card" onclick="showCategory('Local Services')"><span>🔧</span>Local Services</div>
-    </div>
-</section>
-
-<section id="offers">
-    <h2 class="section-title">🔴 Shop Price Tracker</h2>
-    <div id="results">
-        Select your area and category to explore.
-    </div>
-</section>
-
-<section id="about">
-    <h2 class="section-title">About BezawadaDeals</h2>
-    <p style="text-align:center">
-        Your local Vijayawada shopping and price comparison platform.
-    </p>
-</section>
-
-<footer>
-    <p>© 2026 BezawadaDeals | Vijayawada</p>
-</footer>
-
-<script src="/static/js/script.js" defer></script>
-
-</body>
-</html>
+<header><h2>🛍️ BezawadaDeals</h2><nav><a href="#home" data-i18n="home">Home</a><a href="#area" data-i18n="area">Select Area</a><a href="#categories" data-i18n="categories">Categories</a><a href="#shops" data-i18n="shops">Shops & Prices</a><button class="lang" id="languageBtn" type="button">తెలుగు</button></nav></header>
+<main id="home"><div class="hero"><h1 data-i18n="heroTitle">Vijayawada Shopping Made Easy!</h1><p data-i18n="heroSub">Find nearby shops, products and verified local prices.</p><div class="search"><input id="searchInput" type="search" placeholder="Search shops or products..."><button class="primary" id="searchBtn" data-i18n="search">Search</button></div></div>
+<section class="section" id="area"><h2 class="title" data-i18n="areaTitle">📍 Select Your Area</h2><div class="panel"><div class="filters"><div><label for="wardSelect" data-i18n="wardLabel">Vijayawada Ward / Area</label><select id="wardSelect"><option value="">Loading ward details...</option></select></div><div><label for="sortSelect" data-i18n="sortLabel">Sort Shops</label><select id="sortSelect"><option value="name">Name</option><option value="price_low">Price: Low to High</option><option value="price_high">Price: High to Low</option></select></div></div><p id="wardMessage" class="hint">Loading ward data...</p></div></section>
+<section class="section" id="categories"><h2 class="title" data-i18n="categoryTitle">Explore All Categories</h2><div id="categoryGrid" class="category-grid"></div></section>
+<section class="section" id="shops"><h2 class="title" data-i18n="shopTitle">Shops, Products & Price Tracker</h2><div class="panel"><div class="toolbar"><strong id="selectedSummary">Select an area and category</strong><button id="showAllBtn" type="button">Show All Categories</button></div><p class="status" id="dataStatus">Prices are shown only when verified data is available.</p><div id="shopResults" class="shops"><div class="empty">Choose a ward and category to find shops.</div></div></div></section>
+<section class="section" id="mapSection"><h2 class="title" data-i18n="mapTitle">Shop Map</h2><div class="panel"><iframe id="mapFrame" title="Shop location map" loading="lazy" src="about:blank"></iframe><p id="mapNote">Shop map pins will appear when verified shop coordinates are available.</p></div></section>
+<section class="section"><h2 class="title" data-i18n="aboutTitle">About BezawadaDeals</h2><p style="text-align:center" data-i18n="aboutText">Your Vijayawada local shopping, shop discovery and price comparison platform.</p></section></main>
+<footer>© 2026 BezawadaDeals | Vijayawada</footer>
+<script>
+'use strict';
+const API={wards:'/api/wards',shops:'/api/shops'}; // Confirm these routes in app.py before deployment.
+const categories=[
+['All','🧭','All Categories'],['Vegetables','🥦','Vegetables'],['Fruits','🍎','Fruits'],['Groceries','🛒','Groceries'],['Rice & Pulses','🌾','Rice & Pulses'],['Dairy & Bakery','🥛','Dairy & Bakery'],['Meat & Seafood','🍗','Meat & Seafood'],['Supermarkets','🏬','Supermarkets'],['Wholesale Stores','📦','Wholesale Stores'],['Shopping Malls','🛍️','Shopping Malls'],['Department Stores','🏪','Department Stores'],['Restaurants','🍽️','Restaurants'],['Fast Food','🍔','Fast Food'],['Cafes & Tea Shops','☕','Cafes & Tea Shops'],['Juice & Ice Cream','🧃','Juice & Ice Cream'],['Bakeries & Sweets','🍰','Bakeries & Sweets'],['Electronics','📱','Electronics'],['Mobile Stores','📲','Mobile Stores'],['Computers','💻','Computers'],['Home Appliances','🔌','Home Appliances'],['Fashion & Clothing','👗','Fashion & Clothing'],['Footwear','👟','Footwear'],['Bags & Luggage','👜','Bags & Luggage'],['Jewellery','💍','Jewellery'],['Watches & Accessories','⌚','Watches & Accessories'],['Cosmetics','💄','Cosmetics'],['Medical Stores','💊','Medical Stores'],['Hospitals & Clinics','🏥','Hospitals & Clinics'],['Optical Stores','👓','Optical Stores'],['Petrol Bunks','⛽','Petrol Bunks'],['Automobile Sales','🚗','Automobile Sales'],['Vehicle Repair','🛠️','Vehicle Repair'],['Hardware','🔩','Hardware'],['Electrical Stores','💡','Electrical Stores'],['Furniture','🪑','Furniture'],['Home & Kitchen','🍳','Home & Kitchen'],['Books & Stationery','📚','Books & Stationery'],['Toys & Baby Stores','🧸','Toys & Baby Stores'],['Sports & Fitness','🏏','Sports & Fitness'],['Flower Shops','💐','Flower Shops'],['Gift Shops','🎁','Gift Shops'],['Salons & Beauty Parlours','💇','Salons & Beauty Parlours'],['Laundry & Dry Cleaning','🧺','Laundry & Dry Cleaning'],['Photo & Printing','🖨️','Photo & Printing'],['Banks & ATMs','🏦','Banks & ATMs'],['Mobile & Internet Services','📶','Mobile & Internet Services'],['Repair Services','🔧','Repair Services'],['Education & Coaching','🎓','Education & Coaching'],['Travel & Transport','🚌','Travel & Transport'],['Local Services','🧰','Local Services'],['Other Shops','🏷️','Other Shops']
+];
+const translations={en:{home:'Home',area:'Select Area',categories:'Categories',shops:'Shops & Prices',heroTitle:'Vijayawada Shopping Made Easy!',heroSub:'Find nearby shops, products and verified local prices.',search:'Search',areaTitle:'📍 Select Your Area',wardLabel:'Vijayawada Ward / Area',sortLabel:'Sort Shops',categoryTitle:'Explore All Categories',shopTitle:'Shops, Products & Price Tracker',mapTitle:'Shop Map',aboutTitle:'About BezawadaDeals',aboutText:'Your Vijayawada local shopping, shop discovery and price comparison platform.',all:'All Categories',choose:'Select an area and category',waiting:'Loading ward data...',noShops:'No verified shops found for this selection.',mapWaiting:'Shop map pins will appear when verified shop coordinates are available.',priceUnavailable:'Price not verified',lastUpdated:'Last updated',live:'Verified price',showAll:'Show All Categories'},te:{home:'హోమ్',area:'ప్రాంతాన్ని ఎంచుకోండి',categories:'వర్గాలు',shops:'దుకాణాలు & ధరలు',heroTitle:'విజయవాడలో షాపింగ్ ఇక సులభం!',heroSub:'దగ్గరలోని దుకాణాలు, వస్తువులు, నిర్ధారించిన ధరలను తెలుసుకోండి.',search:'వెతకండి',areaTitle:'📍 మీ ప్రాంతాన్ని ఎంచుకోండి',wardLabel:'విజయవాడ వార్డు / ప్రాంతం',sortLabel:'దుకాణాల క్రమం',categoryTitle:'అన్ని కేటగిరీలు',shopTitle:'దుకాణాలు, వస్తువులు & ధరల వివరాలు',mapTitle:'దుకాణాల మ్యాప్',aboutTitle:'బెజవాడ డీల్స్ గురించి',aboutText:'విజయవాడ స్థానిక దుకాణాలు, వస్తువులు, ధరల పోలిక వేదిక.',all:'అన్ని కేటగిరీలు',choose:'ప్రాంతం, కేటగిరీ ఎంచుకోండి',waiting:'వార్డుల వివరాలు వస్తున్నాయి...',noShops:'ఈ ఎంపికకు నిర్ధారించిన దుకాణాలు లేవు.',mapWaiting:'దుకాణాల ఖచ్చితమైన మ్యాప్ స్థానాలు అందుబాటులోకి వచ్చినప్పుడు ఇక్కడ కనిపిస్తాయి.',priceUnavailable:'ధర నిర్ధారించబడలేదు',lastUpdated:'చివరిగా నవీకరించిన సమయం',live:'నిర్ధారించిన ధర',showAll:'అన్ని కేటగిరీలు చూపించు'},hi:{home:'होम',area:'क्षेत्र चुनें',categories:'श्रेणियाँ',shops:'दुकानें और कीमतें',heroTitle:'विजयवाड़ा में खरीदारी अब आसान!',heroSub:'नज़दीकी दुकानें, उत्पाद और सत्यापित स्थानीय कीमतें खोजें।',search:'खोजें',areaTitle:'📍 अपना क्षेत्र चुनें',wardLabel:'विजयवाड़ा वार्ड / क्षेत्र',sortLabel:'दुकानें क्रमबद्ध करें',categoryTitle:'सभी श्रेणियाँ',shopTitle:'दुकानें, उत्पाद और मूल्य ट्रैकर',mapTitle:'दुकान का नक्शा',aboutTitle:'BezawadaDeals के बारे में',aboutText:'विजयवाड़ा का स्थानीय खरीदारी और मूल्य तुलना मंच।',all:'सभी श्रेणियाँ',choose:'क्षेत्र और श्रेणी चुनें',waiting:'वार्ड विवरण लोड हो रहे हैं...',noShops:'इस चयन के लिए सत्यापित दुकानें नहीं मिलीं।',mapWaiting:'सत्यापित दुकान निर्देशांक उपलब्ध होने पर मानचित्र पिन दिखेंगे।',priceUnavailable:'कीमत सत्यापित नहीं',lastUpdated:'अंतिम अपडेट',live:'सत्यापित कीमत',showAll:'सभी श्रेणियाँ दिखाएँ'}};
+let language='en',selectedCategory='All',wards=[],shops=[];
+const $=id=>document.getElementById(id);
+function t(key){return translations[language][key]||translations.en[key]||key}
+function setLanguage(lang){language=lang;document.documentElement.lang=lang;document.querySelectorAll('[data-i18n]').forEach(el=>{const k=el.dataset.i18n;el.textContent=t(k)});$('languageBtn').textContent=lang==='en'?'తెలుగు':lang==='te'?'हिन्दी':'English';$('showAllBtn').textContent=t('showAll');renderCategories();renderShops();}
+$('languageBtn').addEventListener('click',()=>setLanguage(language==='en'?'te':language==='te'?'hi':'en'));
+function renderCategories(){const grid=$('categoryGrid');grid.innerHTML='';categories.forEach(([id,emoji,name])=>{const b=document.createElement('button');b.type='button';b.className='category'+(selectedCategory===id?' active':'');b.innerHTML=`<span>${emoji}</span>${id==='All'?t('all'):name}`;b.addEventListener('click',()=>{selectedCategory=id;renderCategories();loadShops()});grid.appendChild(b)})}
+function normalizeList(data,key){if(Array.isArray(data))return data;if(data&&Array.isArray(data[key]))return data[key];return []}
+async function loadWards(){const select=$('wardSelect');try{const res=await fetch(API.wards,{headers:{Accept:'application/json'}});if(!res.ok)throw new Error('Ward API returned '+res.status);const data=await res.json();wards=normalizeList(data,'wards');select.innerHTML='<option value="">Select Ward / Area</option>';wards.forEach(w=>{const opt=document.createElement('option');opt.value=w.ward_number??w.id;const area=w.area_name&&w.area_name!=='Area details pending'?w.area_name:'Area name pending';opt.textContent=`Ward ${w.ward_number??w.id} — ${area}`;select.appendChild(opt)});$('wardMessage').textContent=wards.length?`${wards.length} wards loaded.`:'No ward records found.'}catch(err){select.innerHTML='<option value="">Ward data unavailable</option>';$('wardMessage').textContent='Could not load /api/wards. Check the backend and try again.';console.error(err)}}
+function selectedWard(){return $('wardSelect').value}
+async function loadShops(){const ward=selectedWard();if(!ward){$('selectedSummary').textContent=t('choose');$('shopResults').innerHTML=`<div class="empty">${t('choose')}</div>`;return}const params=new URLSearchParams({ward_number:ward,category:selectedCategory});const q=$('searchInput').value.trim();if(q)params.set('search',q);$('selectedSummary').textContent=$('wardSelect').selectedOptions[0]?.textContent+' · '+(selectedCategory==='All'?t('all'):selectedCategory);$('dataStatus').textContent='Loading shop and verified price data...';try{const res=await fetch(`${API.shops}?${params.toString()}`,{headers:{Accept:'application/json'}});if(!res.ok)throw new Error('Shop API returned '+res.status);const data=await res.json();shops=normalizeList(data,'shops');renderShops();$('dataStatus').textContent=`${shops.length} shop records received. Live status depends on verified price-feed data.`}catch(err){$('shopResults').innerHTML='<div class="empty">Shop data API is not connected yet. Backend must provide GET /api/shops?ward_number=...&category=...</div>';$('dataStatus').textContent='The ward selector works only if /api/wards is available. Shop list and live prices need a connected shop API.';console.error(err)}}
+function renderShops(){const root=$('shopResults');if(!shops.length){root.innerHTML=`<div class="empty">${t('noShops')}</div>`;return}const sort=$('sortSelect').value;const list=[...shops];if(sort==='name')list.sort((a,b)=>(a.name||a.shop_name||'').localeCompare(b.name||b.shop_name||''));if(sort==='price_low')list.sort((a,b)=>(Number(a.price)||Infinity)-(Number(b.price)||Infinity));if(sort==='price_high')list.sort((a,b)=>(Number(b.price)||0)-(Number(a.price)||0));root.innerHTML='';list.forEach(shop=>{const name=shop.name||shop.shop_name||'Shop name unavailable';const img=shop.image_url||shop.photo_url||'';const addr=shop.address||shop.locality||'Address not available';const lat=Number(shop.latitude??shop.lat),lon=Number(shop.longitude??shop.lng??shop.lon);const hasCoords=Number.isFinite(lat)&&Number.isFinite(lon)&&lat!==0&&lon!==0;const price=shop.price??shop.display_price;const verified=shop.is_live===true||shop.price_verified===true;const updated=shop.updated_at||shop.last_updated||'';const card=document.createElement('article');card.className='shop';const image=img?`<img src="${escapeAttr(img)}" alt="${escapeAttr(name)}" loading="lazy">`:'<div class="shopimg" style="height:155px;display:grid;place-items:center;background:#edf2ee;font-size:42px">🏪</div>';const priceHtml=price!==undefined&&price!==null?`₹${escapeHtml(String(price))}`:t('priceUnavailable');card.innerHTML=`${image}<div class="shopbody"><h3>${escapeHtml(name)}</h3><p class="muted">${escapeHtml(shop.category||selectedCategory)} · ${escapeHtml(addr)}</p><div class="price">${priceHtml}</div><div class="${verified?'live':'muted'}">${verified?'● '+t('live'):'○ '+t('priceUnavailable')}</div>${updated?`<p class="muted">${t('lastUpdated')}: ${escapeHtml(updated)}</p>`:''}${hasCoords?`<a class="maplink" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}">View Shop on Map ↗</a>`:'<p class="muted">Shop coordinates unavailable</p>'}</div>`;root.appendChild(card)});updateMap(list)}
+function updateMap(list){const points=list.filter(s=>Number.isFinite(Number(s.latitude??s.lat))&&Number.isFinite(Number(s.longitude??s.lng??s.lon)));if(!points.length){$('mapFrame').src='about:blank';$('mapNote').textContent=t('mapWaiting');return}const s=points[0],lat=Number(s.latitude??s.lat),lon=Number(s.longitude??s.lng??s.lon);$('mapFrame').src=`https://www.openstreetmap.org/export/embed.html?bbox=${lon-0.012}%2C${lat-0.009}%2C${lon+0.012}%2C${lat+0.009}&layer=mapnik&marker=${lat}%2C${lon}`;$('mapNote').textContent=`Map centered on ${points.length} returned shop location(s). Individual shop links are shown on each card.`}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function escapeAttr(s){return escapeHtml(s)}
+$('wardSelect').addEventListener('change',loadShops);$('sortSelect').addEventListener('change',renderShops);$('showAllBtn').addEventListener('click',()=>{selectedCategory='All';renderCategories();loadShops()});$('searchBtn').addEventListener('click',loadShops);$('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter')loadShops()});
+renderCategories();loadWards();
+</script>
+</body></html>
