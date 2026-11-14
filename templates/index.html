@@ -1,212 +1,411 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>BezawadaDeals | Vijayawada Shopping Marketplace</title>
+<title>BezawadaDeals | Vijayawada Local Marketplace</title>
+<meta name="description" content="Discover local shops, groceries, fruits, vegetables and best prices across Vijayawada.">
 
-    <meta name="description" content="Discover the best shopping, restaurants, supermarkets, electronics and local deals in Vijayawada.">
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
 
-    <meta name="keywords" content="Vijayawada shopping, BezawadaDeals, local deals, restaurants, supermarkets">
+body {
+    background: #f7f8fc;
+    color: #222;
+}
 
-    <meta name="theme-color" content="#ffffff">
+header {
+    background: white;
+    padding: 16px 6%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    box-shadow: 0 2px 12px #ddd;
+}
 
-    <link rel="stylesheet" href="/static/css/style.css">
+.logo {
+    font-size: 25px;
+    font-weight: bold;
+    color: #e65b22;
+}
+
+nav a {
+    text-decoration: none;
+    color: #333;
+    margin: 8px;
+    font-weight: bold;
+}
+
+.hero {
+    background: linear-gradient(120deg,#e95b24,#ff9b35);
+    color: white;
+    text-align: center;
+    padding: 55px 15px;
+}
+
+.hero h1 {
+    font-size: 34px;
+    margin-bottom: 15px;
+}
+
+.hero p {
+    margin-bottom: 25px;
+}
+
+.search-box {
+    max-width: 650px;
+    margin: auto;
+    display: flex;
+    gap: 8px;
+}
+
+.search-box input {
+    flex: 1;
+    padding: 15px;
+    border: none;
+    border-radius: 8px;
+    outline: none;
+}
+
+button {
+    background: #173f32;
+    color: white;
+    padding: 13px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+section {
+    padding: 35px 6%;
+}
+
+.section-title {
+    font-size: 25px;
+    margin-bottom: 20px;
+}
+
+.ward-box {
+    background: white;
+    padding: 22px;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px #ddd;
+}
+
+.ward-box select {
+    width: 100%;
+    padding: 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-top: 12px;
+    background: white;
+}
+
+.category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(145px,1fr));
+    gap: 18px;
+}
+
+.category {
+    background: white;
+    padding: 25px 12px;
+    text-align: center;
+    border-radius: 13px;
+    box-shadow: 0 2px 12px #e4e4e4;
+    cursor: pointer;
+    transition: .2s;
+}
+
+.category:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 18px #ccc;
+}
+
+.category .emoji {
+    font-size: 38px;
+    margin-bottom: 12px;
+}
+
+.category h3 {
+    font-size: 15px;
+}
+
+.info-card {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    line-height: 1.8;
+}
+
+#results {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
+    gap: 15px;
+}
+
+.result-card {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px #ddd;
+}
+
+.result-card h3 {
+    margin-bottom: 10px;
+    color: #e65b22;
+}
+
+footer {
+    background: #173f32;
+    color: white;
+    text-align: center;
+    padding: 25px;
+    line-height: 2;
+}
+
+footer a {
+    color: white;
+    margin: 8px;
+}
+
+@media(max-width:600px) {
+    header {
+        justify-content: center;
+        text-align: center;
+    }
+
+    nav {
+        width: 100%;
+    }
+
+    nav a {
+        display: inline-block;
+        font-size: 13px;
+    }
+
+    .hero h1 {
+        font-size: 27px;
+    }
+
+    .search-box {
+        flex-direction: column;
+    }
+}
+</style>
 </head>
 
 <body>
 
-<header class="header">
-    <div class="container navbar">
+<header>
+    <div class="logo">🛍️ BezawadaDeals</div>
 
-        <a href="/" class="logo">
-            <span class="logo-icon">B</span>
-            <span>Bezawada<span class="logo-highlight">Deals</span></span>
-        </a>
-
-        <nav class="nav-links">
-            <a href="/">Home</a>
-            <a href="#categories">Categories</a>
-            <a href="#offers">Offers</a>
-            <a href="#about">About</a>
-        </nav>
-
-        <button class="menu-btn" id="menuBtn">☰</button>
-
-    </div>
+    <nav>
+        <a href="#home">Home</a>
+        <a href="#wards">Select Ward</a>
+        <a href="#categories">Categories</a>
+        <a href="#offers">Deals</a>
+        <a href="#about">About</a>
+    </nav>
 </header>
 
-<main>
+<div class="hero" id="home">
+    <h1>Vijayawada Shopping Made Easy!</h1>
+    <p>Find nearby shops. Compare prices. Save Money.</p>
 
-<section class="hero">
-    <div class="container hero-content">
+    <div class="search-box">
+        <input id="searchInput"
+        type="search"
+        placeholder="Search vegetables, fruits, shops...">
 
-        <div class="hero-text">
-            <span class="tagline">WELCOME TO BEZAWADADEALS</span>
+        <button onclick="searchItems()">Search</button>
+    </div>
+</div>
 
-            <h1>
-                Discover the Best
-                <span>Deals in Vijayawada</span>
-            </h1>
+<section id="wards">
+    <h2 class="section-title">📍 Select Your Area / Ward</h2>
 
-            <p>
-                Shop Local. Save More.
-                Explore shopping, food, supermarkets and services
-                around your city.
-            </p>
+    <div class="ward-box">
+        <h3>Choose your Vijayawada Ward</h3>
+        <select id="wardSelect" onchange="selectWard()">
+            <option value="">Select Ward</option>
+        </select>
+        <p id="wardMessage" style="margin-top:12px;color:#16834a;"></p>
+    </div>
+</section>
 
-            <div class="search-box">
-                <input
-                    type="search"
-                    id="searchInput"
-                    placeholder="Search shops, food, products..."
-                >
-                <button id="searchBtn">Search</button>
-            </div>
+<section id="categories">
+    <h2 class="section-title">🛒 Explore Categories</h2>
 
-            <p class="location-text">
-                📍 Discover Local Deals in Vijayawada
-            </p>
+    <div class="category-grid">
+
+        <div class="category" onclick="showCategory('Vegetables')">
+            <div class="emoji">🥦</div>
+            <h3>Vegetables</h3>
         </div>
 
-        <div class="hero-visual">
-            <div class="hero-card">
-                <span>🛍️</span>
-                <h2>Smart Shopping</h2>
-                <p>More Choices. Better Deals.</p>
-            </div>
+        <div class="category" onclick="showCategory('Fruits')">
+            <div class="emoji">🍎</div>
+            <h3>Fresh Fruits</h3>
+        </div>
+
+        <div class="category" onclick="showCategory('Groceries')">
+            <div class="emoji">🛒</div>
+            <h3>Groceries</h3>
+        </div>
+
+        <div class="category" onclick="showCategory('Supermarkets')">
+            <div class="emoji">🏪</div>
+            <h3>Supermarkets</h3>
+        </div>
+
+        <div class="category" onclick="showCategory('Shopping Malls')">
+            <div class="emoji">🏬</div>
+            <h3>Shopping Malls</h3>
+        </div>
+
+        <div class="category" onclick="showCategory('Restaurants')">
+            <div class="emoji">🍔</div>
+            <h3>Restaurants</h3>
+        </div>
+
+        <div class="category" onclick="showCategory('Electronics')">
+            <div class="emoji">📱</div>
+            <h3>Electronics</h3>
+        </div>
+
+        <div class="category" onclick="showCategory('Fashion')">
+            <div class="emoji">👗</div>
+            <h3>Fashion</h3>
+        </div>
+
+        <div class="category" onclick="showCategory('Accessories')">
+            <div class="emoji">💄</div>
+            <h3>Accessories</h3>
+        </div>
+
+        <div class="category" onclick="showCategory('Medical Stores')">
+            <div class="emoji">💊</div>
+            <h3>Medical Stores</h3>
+        </div>
+
+        <div class="category" onclick="showCategory('Local Services')">
+            <div class="emoji">🔧</div>
+            <h3>Local Services</h3>
         </div>
 
     </div>
 </section>
 
-<section class="categories section" id="categories">
-
-    <div class="container">
-
-        <div class="section-heading">
-            <span>EXPLORE OUR MARKETPLACE</span>
-            <h2>Shop by Categories</h2>
-            <p>Everything you need, all in one place.</p>
-        </div>
-
-        <div class="category-grid">
-
-            <a href="#offers" class="category-card">
-                <span class="category-icon">🥦</span>
-                <h3>Vegetables</h3>
-                <p>Fresh Market</p>
-            </a>
-
-            <a href="#offers" class="category-card">
-                <span class="category-icon">🍎</span>
-                <h3>Fruits</h3>
-                <p>Fresh & Healthy</p>
-            </a>
-
-            <a href="#offers" class="category-card">
-                <span class="category-icon">🛒</span>
-                <h3>Supermarkets</h3>
-                <p>Daily Essentials</p>
-            </a>
-
-            <a href="#offers" class="category-card">
-                <span class="category-icon">🏬</span>
-                <h3>Shopping Malls</h3>
-                <p>Premium Shopping</p>
-            </a>
-
-            <a href="#offers" class="category-card">
-                <span class="category-icon">🍔</span>
-                <h3>Restaurants</h3>
-                <p>Food & Dining</p>
-            </a>
-
-            <a href="#offers" class="category-card">
-                <span class="category-icon">📱</span>
-                <h3>Electronics</h3>
-                <p>Smart Gadgets</p>
-            </a>
-
-            <a href="#offers" class="category-card">
-                <span class="category-icon">👗</span>
-                <h3>Fashion</h3>
-                <p>Style & Trends</p>
-            </a>
-
-            <a href="#offers" class="category-card">
-                <span class="category-icon">💄</span>
-                <h3>Accessories</h3>
-                <p>Beauty & Lifestyle</p>
-            </a>
-
-            <a href="#offers" class="category-card">
-                <span class="category-icon">💊</span>
-                <h3>Medical Stores</h3>
-                <p>Health Essentials</p>
-            </a>
-
-            <a href="#offers" class="category-card">
-                <span class="category-icon">🔧</span>
-                <h3>Local Services</h3>
-                <p>Services Near You</p>
-            </a>
-
-        </div>
-
-    </div>
-
-</section>
-
-<section class="offers section" id="offers">
-    <div class="container">
-        <div class="section-heading">
-            <span>DISCOVER MORE</span>
-            <h2>Latest Local Deals</h2>
-            <p>Explore offers and local businesses in Vijayawada.</p>
-        </div>
-
-        <div id="results" class="results">
-            <p class="empty-message">
-                New local deals will appear here soon.
-            </p>
+<section id="offers">
+    <h2 class="section-title">🔍 Search Results</h2>
+    <div id="results">
+        <div class="info-card">
+            Select a category or search for products to explore.
         </div>
     </div>
 </section>
 
-<section class="about section" id="about">
-    <div class="container">
-        <h2>About BezawadaDeals</h2>
+<section id="about">
+    <h2 class="section-title">About BezawadaDeals</h2>
+    <div class="info-card">
         <p>
-            BezawadaDeals is a local shopping marketplace
-            designed to help Vijayawada residents discover
-            shops, restaurants, supermarkets and services.
+            BezawadaDeals is a Vijayawada local shopping marketplace.
+            Our goal is to help customers discover nearby shops,
+            compare prices and find better deals across Vijayawada.
         </p>
-        <p>Shop Local. Save More.</p>
+        <p>
+            Shop owners will be able to update their products,
+            prices and offers through our upcoming platform.
+        </p>
     </div>
 </section>
 
-</main>
-
-<footer class="footer">
-    <div class="container">
-        <h2>BezawadaDeals</h2>
-        <p>Vijayawada's Local Shopping Marketplace</p>
-
-        <div class="footer-links">
-            <a href="#about">About Us</a>
-            <a href="/privacy">Privacy Policy</a>
-            <a href="/contact">Contact Us</a>
-        </div>
-
-        <p>© 2026 BezawadaDeals. All Rights Reserved.</p>
-    </div>
+<footer>
+    <h3>🛍️ BezawadaDeals</h3>
+    <p>Discover Local. Compare Prices. Save More.</p>
+    <a href="/privacy">Privacy Policy</a>
+    <a href="/contact">Contact Us</a>
+    <p>© 2026 BezawadaDeals. All Rights Reserved.</p>
 </footer>
 
-<script src="/static/js/script.js"></script>
+<script>
+const wardSelect = document.getElementById("wardSelect");
+
+for (let i = 1; i <= 81; i++) {
+    const option = document.createElement("option");
+    option.value = "Ward " + i;
+    option.textContent = "Ward " + i;
+    wardSelect.appendChild(option);
+}
+
+function selectWard() {
+    const ward = wardSelect.value;
+
+    document.getElementById("wardMessage").textContent =
+        ward ? "Selected: " + ward : "";
+}
+
+function showCategory(category) {
+    document.getElementById("results").innerHTML = `
+        <div class="result-card">
+            <h3>${category}</h3>
+            <p>Selected Category: ${category}</p>
+            <p>Choose your ward to explore local listings.</p>
+            <p>Shop and price data will appear after database integration.</p>
+        </div>
+    `;
+
+    document.getElementById("offers").scrollIntoView({
+        behavior: "smooth"
+    });
+}
+
+function searchItems() {
+    const search = document.getElementById("searchInput")
+        .value.trim();
+
+    const results = document.getElementById("results");
+
+    if (!search) {
+        results.innerHTML =
+            '<div class="info-card">Please enter a product or shop name.</div>';
+        return;
+    }
+
+    results.innerHTML = `
+        <div class="result-card">
+            <h3>Search: ${escapeHTML(search)}</h3>
+            <p>Database search will be connected in the next step.</p>
+        </div>
+    `;
+
+    document.getElementById("offers").scrollIntoView({
+        behavior: "smooth"
+    });
+}
+
+function escapeHTML(value) {
+    return value.replace(/[&<>"']/g, function(char) {
+        return {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;"
+        }[char];
+    });
+}
+</script>
 
 </body>
 </html>
-
