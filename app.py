@@ -1,16 +1,29 @@
 import os
+import json
 import traceback
 from pathlib import Path
-from datetime import datetime, timezone
 
 import psycopg
 from psycopg.rows import dict_row
-from fastapi import FastAPI, Request, Header, HTTPException
+
+from fastapi import (
+    FastAPI,
+    Request,
+    Header,
+    HTTPException,
+    UploadFile,
+    File
+)
+
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
+
+# ==========================================
+# BEZAWADA DEALS APPLICATION
+# ==========================================
 
 app = FastAPI(
     title="BezawadaDeals",
@@ -42,6 +55,10 @@ if PUBLIC_DIR.is_dir():
     )
 
 
+# ==========================================
+# CATEGORIES
+# ==========================================
+
 CATEGORIES = [
     "Vegetables",
     "Fruits",
@@ -57,16 +74,26 @@ CATEGORIES = [
 ]
 
 
+# ==========================================
+# DATABASE CONNECTION
+# ==========================================
+
 def get_database_url():
+
     url = os.getenv("DATABASE_URL")
 
     if url and url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1)
+        url = url.replace(
+            "postgres://",
+            "postgresql://",
+            1
+        )
 
     return url
 
 
 def get_connection():
+
     database_url = get_database_url()
 
     if not database_url:
@@ -82,6 +109,10 @@ def get_connection():
     )
 
 
+# ==========================================
+# CREATE DATABASE TABLES
+# ==========================================
+
 def create_database_tables():
 
     sql_commands = [
@@ -90,7 +121,8 @@ def create_database_tables():
         CREATE TABLE IF NOT EXISTS wards (
             id BIGSERIAL PRIMARY KEY,
             ward_number INTEGER UNIQUE NOT NULL,
-            area_name TEXT NOT NULL DEFAULT 'Area details pending',
+            area_name TEXT NOT NULL
+                DEFAULT 'Area details pending',
             is_active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMPTZ DEFAULT NOW()
         )
@@ -99,7 +131,8 @@ def create_database_tables():
         """
         CREATE TABLE IF NOT EXISTS localities (
             id BIGSERIAL PRIMARY KEY,
-            ward_id BIGINT NOT NULL REFERENCES wards(id),
+            ward_id BIGINT NOT NULL
+                REFERENCES wards(id),
             locality_name TEXT NOT NULL,
             locality_name_te TEXT,
             is_verified BOOLEAN DEFAULT FALSE,
@@ -121,7 +154,8 @@ def create_database_tables():
             latitude DOUBLE PRECISION,
             longitude DOUBLE PRECISION,
             is_verified BOOLEAN DEFAULT FALSE,
-            data_connection_status TEXT DEFAULT 'not_connected',
+            data_connection_status TEXT
+                DEFAULT 'not_connected',
             created_at TIMESTAMPTZ DEFAULT NOW()
         )
         """,
@@ -141,8 +175,10 @@ def create_database_tables():
         CREATE TABLE IF NOT EXISTS prices (
             id BIGSERIAL PRIMARY KEY,
             shop_id BIGINT REFERENCES shops(id),
-            product_id BIGINT NOT NULL REFERENCES products(id),
-            price NUMERIC(12,2) NOT NULL CHECK (price >= 0),
+            product_id BIGINT NOT NULL
+                REFERENCES products(id),
+            price NUMERIC(12,2) NOT NULL
+                CHECK (price >= 0),
             price_type TEXT DEFAULT 'shop_retail',
             source_name TEXT,
             source_type TEXT DEFAULT 'manual',
@@ -151,7 +187,8 @@ def create_database_tables():
         )
         """,
 
-        # Safe migrations for existing database
+        # Safe migrations
+
         """
         ALTER TABLE shops
         ADD COLUMN IF NOT EXISTS locality_id BIGINT
@@ -176,13 +213,17 @@ def create_database_tables():
 
         """
         ALTER TABLE prices
-        ADD COLUMN IF NOT EXISTS source_type TEXT DEFAULT 'manual'
+        ADD COLUMN IF NOT EXISTS source_type TEXT
+        DEFAULT 'manual'
         """,
 
         """
         ALTER TABLE prices
-        ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT FALSE
+        ADD COLUMN IF NOT EXISTS is_live BOOLEAN
+        DEFAULT FALSE
         """,
+
+        # Indexes
 
         """
         CREATE INDEX IF NOT EXISTS idx_shops_ward
@@ -216,7 +257,9 @@ def create_database_tables():
     ]
 
     try:
+
         with get_connection() as connection:
+
             with connection.cursor() as cursor:
 
                 for command in sql_commands:
@@ -233,22 +276,29 @@ def create_database_tables():
                         'Area details pending',
                         TRUE
                     FROM generate_series(1, 86) AS ward_no
-                    ON CONFLICT (ward_number) DO NOTHING
+                    ON CONFLICT (ward_number)
+                    DO NOTHING
                 """)
 
             connection.commit()
 
-        print("BezawadaDeals database upgraded successfully.")
+        print(
+            "BezawadaDeals database upgraded successfully."
+        )
+
         return True
 
     except Exception as error:
+
         print("Database setup error:", error)
         traceback.print_exc()
+
         return False
 
 
 @app.on_event("startup")
 async def startup_event():
+
     create_database_tables()
 
 
@@ -260,12 +310,14 @@ async def startup_event():
 async def home(request: Request):
 
     if not TEMPLATE_DIR:
+
         return HTMLResponse(
             "<h1>Templates folder not found</h1>",
             status_code=500
         )
 
     if not (TEMPLATE_DIR / "index.html").is_file():
+
         return HTMLResponse(
             "<h1>index.html not found</h1>",
             status_code=500
@@ -284,6 +336,7 @@ async def home(request: Request):
 
 @app.get("/health")
 async def health():
+
     return {
         "status": "online",
         "website": "BezawadaDeals",
@@ -293,6 +346,7 @@ async def health():
 
 @app.get("/api/status")
 async def api_status():
+
     return {
         "success": True,
         "message": "BezawadaDeals backend is running",
@@ -304,8 +358,11 @@ async def api_status():
 async def database_status():
 
     try:
+
         with get_connection() as connection:
+
             with connection.cursor() as cursor:
+
                 cursor.execute("""
                     SELECT table_name
                     FROM information_schema.tables
@@ -325,6 +382,7 @@ async def database_status():
         }
 
     except Exception as error:
+
         return {
             "success": False,
             "database": "connection failed",
@@ -338,6 +396,7 @@ async def database_status():
 
 @app.get("/api/categories")
 async def get_categories():
+
     return {
         "success": True,
         "categories": CATEGORIES
@@ -345,13 +404,14 @@ async def get_categories():
 
 
 # ==========================================
-# 86 WARDS AND AREA NAMES
+# 86 WARDS AND LOCALITIES
 # ==========================================
 
 @app.get("/api/wards")
 async def get_wards():
 
     with get_connection() as connection:
+
         with connection.cursor() as cursor:
 
             cursor.execute("""
@@ -360,6 +420,7 @@ async def get_wards():
                     w.ward_number,
                     w.area_name,
                     w.is_active,
+
                     COALESCE(
                         json_agg(
                             json_build_object(
@@ -368,13 +429,21 @@ async def get_wards():
                                 'name_te', l.locality_name_te,
                                 'verified', l.is_verified
                             )
-                        ) FILTER (WHERE l.id IS NOT NULL),
+                        ) FILTER (
+                            WHERE l.id IS NOT NULL
+                        ),
                         '[]'::json
                     ) AS localities
+
                 FROM wards w
-                LEFT JOIN localities l ON l.ward_id = w.id
+
+                LEFT JOIN localities l
+                    ON l.ward_id = w.id
+
                 WHERE w.is_active = TRUE
+
                 GROUP BY w.id
+
                 ORDER BY w.ward_number
             """)
 
@@ -388,25 +457,37 @@ async def get_wards():
 
 
 # ==========================================
-# ADD VERIFIED LOCALITY TO A WARD
+# ADMIN API KEY CHECK
 # ==========================================
-
-class LocalityInput(BaseModel):
-    ward_number: int = Field(ge=1, le=86)
-    locality_name: str = Field(min_length=2, max_length=150)
-    locality_name_te: str | None = None
-    is_verified: bool = False
-
 
 def check_admin_key(api_key):
 
     expected = os.getenv("PRICE_FEED_API_KEY")
 
     if not expected or api_key != expected:
+
         raise HTTPException(
             status_code=401,
             detail="Invalid or missing API key"
         )
+
+
+# ==========================================
+# ADD LOCALITY
+# ==========================================
+
+class LocalityInput(BaseModel):
+
+    ward_number: int = Field(ge=1, le=86)
+
+    locality_name: str = Field(
+        min_length=2,
+        max_length=150
+    )
+
+    locality_name_te: str | None = None
+
+    is_verified: bool = False
 
 
 @app.post("/api/admin/localities")
@@ -418,16 +499,19 @@ async def add_locality(
     check_admin_key(x_api_key)
 
     with get_connection() as connection:
+
         with connection.cursor() as cursor:
 
             cursor.execute("""
-                SELECT id FROM wards
+                SELECT id
+                FROM wards
                 WHERE ward_number = %s
             """, (data.ward_number,))
 
             ward = cursor.fetchone()
 
             if not ward:
+
                 raise HTTPException(
                     status_code=404,
                     detail="Ward not found"
@@ -441,10 +525,15 @@ async def add_locality(
                     is_verified
                 )
                 VALUES (%s, %s, %s, %s)
+
                 ON CONFLICT (ward_id, locality_name)
+
                 DO UPDATE SET
-                    locality_name_te = EXCLUDED.locality_name_te,
-                    is_verified = EXCLUDED.is_verified
+                    locality_name_te =
+                        EXCLUDED.locality_name_te,
+                    is_verified =
+                        EXCLUDED.is_verified
+
                 RETURNING id, locality_name
             """, (
                 ward["id"],
@@ -475,12 +564,14 @@ async def get_shops(
 ):
 
     if category not in CATEGORIES:
+
         raise HTTPException(
             status_code=400,
             detail="Invalid category"
         )
 
     with get_connection() as connection:
+
         with connection.cursor() as cursor:
 
             cursor.execute("""
@@ -496,12 +587,22 @@ async def get_shops(
                     s.longitude,
                     w.ward_number,
                     l.locality_name
+
                 FROM shops s
-                JOIN wards w ON w.id = s.ward_id
-                LEFT JOIN localities l ON l.id = s.locality_id
+
+                JOIN wards w
+                    ON w.id = s.ward_id
+
+                LEFT JOIN localities l
+                    ON l.id = s.locality_id
+
                 WHERE w.ward_number = %s
                   AND LOWER(s.category) = LOWER(%s)
-                  AND (%s IS NULL OR s.locality_id = %s)
+                  AND (
+                      %s IS NULL
+                      OR s.locality_id = %s
+                  )
+
                 ORDER BY s.shop_name
             """, (
                 ward_number,
@@ -529,6 +630,7 @@ async def get_shops(
 async def get_shop_products(shop_id: int):
 
     with get_connection() as connection:
+
         with connection.cursor() as cursor:
 
             cursor.execute("""
@@ -542,21 +644,29 @@ async def get_shop_products(shop_id: int):
                     pr.source_type,
                     pr.updated_at,
                     pr.is_live,
+
                     CASE
                         WHEN pr.source_type = 'connected_feed'
-                         AND pr.updated_at >= NOW() - INTERVAL '30 minutes'
+                         AND pr.updated_at >=
+                             NOW() - INTERVAL '30 minutes'
                         THEN TRUE
                         ELSE FALSE
                     END AS live_now
+
                 FROM products p
+
                 JOIN (
                     SELECT DISTINCT ON (product_id)
                         *
                     FROM prices
                     WHERE shop_id = %s
                     ORDER BY product_id, updated_at DESC
-                ) pr ON pr.product_id = p.id
-                ORDER BY p.category, p.product_name
+                ) pr
+                    ON pr.product_id = p.id
+
+                ORDER BY
+                    p.category,
+                    p.product_name
             """, (shop_id,))
 
             rows = cursor.fetchall()
@@ -581,12 +691,14 @@ async def price_tracker(
 ):
 
     if category not in CATEGORIES:
+
         raise HTTPException(
             status_code=400,
             detail="Invalid category"
         )
 
     with get_connection() as connection:
+
         with connection.cursor() as cursor:
 
             cursor.execute("""
@@ -602,21 +714,37 @@ async def price_tracker(
                     pr.source_name,
                     pr.source_type,
                     pr.updated_at,
+
                     CASE
                         WHEN pr.source_type = 'connected_feed'
-                         AND pr.updated_at >= NOW() - INTERVAL '30 minutes'
+                         AND pr.updated_at >=
+                             NOW() - INTERVAL '30 minutes'
                         THEN TRUE
                         ELSE FALSE
                     END AS live_now
+
                 FROM prices pr
-                JOIN shops s ON s.id = pr.shop_id
-                JOIN wards w ON w.id = s.ward_id
-                LEFT JOIN localities l ON l.id = s.locality_id
-                JOIN products p ON p.id = pr.product_id
+
+                JOIN shops s
+                    ON s.id = pr.shop_id
+
+                JOIN wards w
+                    ON w.id = s.ward_id
+
+                LEFT JOIN localities l
+                    ON l.id = s.locality_id
+
+                JOIN products p
+                    ON p.id = pr.product_id
+
                 WHERE w.ward_number = %s
                   AND LOWER(s.category) = LOWER(%s)
-                  AND (%s IS NULL OR
-                       LOWER(p.product_name) = LOWER(%s))
+
+                  AND (
+                      %s IS NULL
+                      OR LOWER(p.product_name) = LOWER(%s)
+                  )
+
                   AND pr.id = (
                       SELECT p2.id
                       FROM prices p2
@@ -625,7 +753,10 @@ async def price_tracker(
                       ORDER BY p2.updated_at DESC
                       LIMIT 1
                   )
-                ORDER BY p.product_name, pr.price ASC
+
+                ORDER BY
+                    p.product_name,
+                    pr.price ASC
             """, (
                 ward_number,
                 category,
@@ -649,12 +780,27 @@ async def price_tracker(
 # ==========================================
 
 class PriceUpdate(BaseModel):
+
     shop_id: int
-    product_name: str = Field(min_length=1, max_length=150)
+
+    product_name: str = Field(
+        min_length=1,
+        max_length=150
+    )
+
     category: str
-    unit: str = Field(min_length=1, max_length=30)
+
+    unit: str = Field(
+        min_length=1,
+        max_length=30
+    )
+
     price: float = Field(ge=0)
-    source_name: str = Field(min_length=1, max_length=150)
+
+    source_name: str = Field(
+        min_length=1,
+        max_length=150
+    )
 
 
 @app.post("/api/prices/update")
@@ -666,31 +812,39 @@ async def update_shop_price(
     check_admin_key(x_api_key)
 
     if data.category not in CATEGORIES:
+
         raise HTTPException(
             status_code=400,
             detail="Invalid category"
         )
 
     with get_connection() as connection:
+
         with connection.cursor() as cursor:
 
             cursor.execute("""
-                SELECT id FROM shops WHERE id = %s
+                SELECT id
+                FROM shops
+                WHERE id = %s
             """, (data.shop_id,))
 
             shop = cursor.fetchone()
 
             if not shop:
+
                 raise HTTPException(
                     status_code=404,
                     detail="Shop not found"
                 )
 
             cursor.execute("""
-                SELECT id FROM products
+                SELECT id
+                FROM products
+
                 WHERE LOWER(product_name) = LOWER(%s)
                   AND LOWER(category) = LOWER(%s)
                   AND LOWER(unit) = LOWER(%s)
+
                 LIMIT 1
             """, (
                 data.product_name,
@@ -701,8 +855,11 @@ async def update_shop_price(
             product = cursor.fetchone()
 
             if product:
+
                 product_id = product["id"]
+
             else:
+
                 cursor.execute("""
                     INSERT INTO products (
                         product_name,
@@ -730,6 +887,7 @@ async def update_shop_price(
                     is_live,
                     updated_at
                 )
+
                 VALUES (
                     %s, %s, %s,
                     'shop_retail',
@@ -738,6 +896,7 @@ async def update_shop_price(
                     TRUE,
                     NOW()
                 )
+
                 RETURNING id, updated_at
             """, (
                 data.shop_id,
@@ -773,11 +932,168 @@ async def check_files():
 
     return {
         "templates_folder": (
-            str(TEMPLATE_DIR) if TEMPLATE_DIR else None
+            str(TEMPLATE_DIR)
+            if TEMPLATE_DIR else None
         ),
+
         "index_html_exists": (
             (TEMPLATE_DIR / "index.html").is_file()
             if TEMPLATE_DIR else False
         ),
+
         "public_folder_exists": PUBLIC_DIR.is_dir()
     }
+
+
+# ==========================================
+# BULK IMPORT: 86 WARDS AND LOCALITIES
+# ==========================================
+
+@app.post("/api/admin/import-wards")
+async def import_wards(
+    file: UploadFile = File(...),
+    x_api_key: str | None = Header(default=None)
+):
+
+    check_admin_key(x_api_key)
+
+    if not file.filename or not file.filename.lower().endswith(".json"):
+
+        raise HTTPException(
+            status_code=400,
+            detail="Please upload a JSON file"
+        )
+
+    try:
+
+        content = await file.read()
+
+        data = json.loads(
+            content.decode("utf-8")
+        )
+
+        ward_list = data.get("wards", [])
+
+        if not isinstance(ward_list, list) or len(ward_list) != 86:
+
+            raise HTTPException(
+                status_code=400,
+                detail="JSON must contain exactly 86 wards"
+            )
+
+        ward_numbers = [
+            int(item["ward_number"])
+            for item in ward_list
+        ]
+
+        if sorted(ward_numbers) != list(range(1, 87)):
+
+            raise HTTPException(
+                status_code=400,
+                detail="Ward numbers must be 1 to 86 exactly once"
+            )
+
+        imported_localities = 0
+
+        with get_connection() as connection:
+
+            with connection.cursor() as cursor:
+
+                for item in ward_list:
+
+                    ward_number = int(item["ward_number"])
+
+                    area_name = str(
+                        item.get("area_name", "")
+                    ).strip()
+
+                    localities = item.get("localities", [])
+
+                    if not area_name:
+
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Area name missing for ward {ward_number}"
+                        )
+
+                    if not isinstance(localities, list):
+
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Localities must be a list for ward {ward_number}"
+                        )
+
+                    cursor.execute("""
+                        INSERT INTO wards (
+                            ward_number,
+                            area_name,
+                            is_active
+                        )
+
+                        VALUES (%s, %s, TRUE)
+
+                        ON CONFLICT (ward_number)
+
+                        DO UPDATE SET
+                            area_name = EXCLUDED.area_name,
+                            is_active = TRUE
+
+                        RETURNING id
+                    """, (
+                        ward_number,
+                        area_name
+                    ))
+
+                    ward_id = cursor.fetchone()["id"]
+
+                    for locality in localities:
+
+                        locality_name = str(locality).strip()
+
+                        if len(locality_name) < 2:
+                            continue
+
+                        cursor.execute("""
+                            INSERT INTO localities (
+                                ward_id,
+                                locality_name,
+                                is_verified
+                            )
+
+                            VALUES (%s, %s, FALSE)
+
+                            ON CONFLICT (
+                                ward_id,
+                                locality_name
+                            )
+
+                            DO NOTHING
+                        """, (
+                            ward_id,
+                            locality_name
+                        ))
+
+                        if cursor.rowcount > 0:
+                            imported_localities += 1
+
+            connection.commit()
+
+        return {
+            "success": True,
+            "message": "Ward data imported successfully",
+            "wards_processed": 86,
+            "new_localities_added": imported_localities,
+            "verified": False
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+
+        traceback.print_exc()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Import failed: {str(error)}"
+        )
