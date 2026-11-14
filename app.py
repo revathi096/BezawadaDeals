@@ -1,9 +1,8 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi import Request
 
 app = FastAPI(
     title="BezawadaDeals",
@@ -12,9 +11,13 @@ app = FastAPI(
 )
 
 if os.path.isdir("public"):
-    app.mount("/static", StaticFiles(directory="public"), name="static")
+    app.mount(
+        "/static",
+        StaticFiles(directory="public"),
+        name="static"
+    )
 
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="Templates")
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -25,5 +28,7 @@ async def home(request: Request):
 
 @app.get("/health")
 async def health():
-    return {"status": "online", "website": "BezawadaDeals"}
-
+    return {
+        "status": "online",
+        "website": "BezawadaDeals"
+    }
