@@ -1,1 +1,212 @@
-templates/index.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>BezawadaDeals | Vijayawada Shopping Marketplace</title>
+
+    <meta name="description" content="Discover the best shopping, restaurants, supermarkets, electronics and local deals in Vijayawada.">
+
+    <meta name="keywords" content="Vijayawada shopping, BezawadaDeals, local deals, restaurants, supermarkets">
+
+    <meta name="theme-color" content="#ffffff">
+
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+
+<header class="header">
+    <div class="container navbar">
+
+        <a href="/" class="logo">
+            <span class="logo-icon">B</span>
+            <span>Bezawada<span class="logo-highlight">Deals</span></span>
+        </a>
+
+        <nav class="nav-links">
+            <a href="/">Home</a>
+            <a href="#categories">Categories</a>
+            <a href="#offers">Offers</a>
+            <a href="#about">About</a>
+        </nav>
+
+        <button class="menu-btn" id="menuBtn">☰</button>
+
+    </div>
+</header>
+
+<main>
+
+<section class="hero">
+    <div class="container hero-content">
+
+        <div class="hero-text">
+            <span class="tagline">WELCOME TO BEZAWADADEALS</span>
+
+            <h1>
+                Discover the Best
+                <span>Deals in Vijayawada</span>
+            </h1>
+
+            <p>
+                Shop Local. Save More.
+                Explore shopping, food, supermarkets and services
+                around your city.
+            </p>
+
+            <div class="search-box">
+                <input
+                    type="search"
+                    id="searchInput"
+                    placeholder="Search shops, food, products..."
+                >
+                <button id="searchBtn">Search</button>
+            </div>
+
+            <p class="location-text">
+                📍 Discover Local Deals in Vijayawada
+            </p>
+        </div>
+
+        <div class="hero-visual">
+            <div class="hero-card">
+                <span>🛍️</span>
+                <h2>Smart Shopping</h2>
+                <p>More Choices. Better Deals.</p>
+            </div>
+        </div>
+
+    </div>
+</section>
+
+<section class="categories section" id="categories">
+
+    <div class="container">
+
+        <div class="section-heading">
+            <span>EXPLORE OUR MARKETPLACE</span>
+            <h2>Shop by Categories</h2>
+            <p>Everything you need, all in one place.</p>
+        </div>
+
+        <div class="category-grid">
+
+            <a href="#offers" class="category-card">
+                <span class="category-icon">🥦</span>
+                <h3>Vegetables</h3>
+                <p>Fresh Market</p>
+            </a>
+
+            <a href="#offers" class="category-card">
+                <span class="category-icon">🍎</span>
+                <h3>Fruits</h3>
+                <p>Fresh & Healthy</p>
+            </a>
+
+            <a href="#offers" class="category-card">
+                <span class="category-icon">🛒</span>
+                <h3>Supermarkets</h3>
+                <p>Daily Essentials</p>
+            </a>
+
+            <a href="#offers" class="category-card">
+                <span class="category-icon">🏬</span>
+                <h3>Shopping Malls</h3>
+                <p>Premium Shopping</p>
+            </a>
+
+            <a href="#offers" class="category-card">
+                <span class="category-icon">🍔</span>
+                <h3>Restaurants</h3>
+                <p>Food & Dining</p>
+            </a>
+
+            <a href="#offers" class="category-card">
+                <span class="category-icon">📱</span>
+                <h3>Electronics</h3>
+                <p>Smart Gadgets</p>
+            </a>
+
+            <a href="#offers" class="category-card">
+                <span class="category-icon">👗</span>
+                <h3>Fashion</h3>
+                <p>Style & Trends</p>
+            </a>
+
+            <a href="#offers" class="category-card">
+                <span class="category-icon">💄</span>
+                <h3>Accessories</h3>
+                <p>Beauty & Lifestyle</p>
+            </a>
+
+            <a href="#offers" class="category-card">
+                <span class="category-icon">💊</span>
+                <h3>Medical Stores</h3>
+                <p>Health Essentials</p>
+            </a>
+
+            <a href="#offers" class="category-card">
+                <span class="category-icon">🔧</span>
+                <h3>Local Services</h3>
+                <p>Services Near You</p>
+            </a>
+
+        </div>
+
+    </div>
+
+</section>
+
+<section class="offers section" id="offers">
+    <div class="container">
+        <div class="section-heading">
+            <span>DISCOVER MORE</span>
+            <h2>Latest Local Deals</h2>
+            <p>Explore offers and local businesses in Vijayawada.</p>
+        </div>
+
+        <div id="results" class="results">
+            <p class="empty-message">
+                New local deals will appear here soon.
+            </p>
+        </div>
+    </div>
+</section>
+
+<section class="about section" id="about">
+    <div class="container">
+        <h2>About BezawadaDeals</h2>
+        <p>
+            BezawadaDeals is a local shopping marketplace
+            designed to help Vijayawada residents discover
+            shops, restaurants, supermarkets and services.
+        </p>
+        <p>Shop Local. Save More.</p>
+    </div>
+</section>
+
+</main>
+
+<footer class="footer">
+    <div class="container">
+        <h2>BezawadaDeals</h2>
+        <p>Vijayawada's Local Shopping Marketplace</p>
+
+        <div class="footer-links">
+            <a href="#about">About Us</a>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/contact">Contact Us</a>
+        </div>
+
+        <p>© 2026 BezawadaDeals. All Rights Reserved.</p>
+    </div>
+</footer>
+
+<script src="/static/js/script.js"></script>
+
+</body>
+</html>
+
