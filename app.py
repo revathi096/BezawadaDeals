@@ -8,16 +8,24 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-# Application
+
+# ==========================================
+# BEZAWADA DEALS APPLICATION
+# ==========================================
+
 app = FastAPI(
     title="BezawadaDeals",
     description="Vijayawada Local Shopping Marketplace",
-    version="2.0.0"
+    version="2.1.0"
 )
+
+
+# ==========================================
+# PROJECT DIRECTORIES
+# ==========================================
 
 BASE_DIR = Path(__file__).resolve().parent
 
-# Find Templates folder
 if (BASE_DIR / "Templates").is_dir():
     TEMPLATE_DIR = BASE_DIR / "Templates"
 elif (BASE_DIR / "templates").is_dir():
@@ -28,9 +36,10 @@ else:
 templates = None
 
 if TEMPLATE_DIR:
-    templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
+    templates = Jinja2Templates(
+        directory=str(TEMPLATE_DIR)
+    )
 
-# Static files
 PUBLIC_DIR = BASE_DIR / "public"
 
 if PUBLIC_DIR.is_dir():
@@ -41,18 +50,30 @@ if PUBLIC_DIR.is_dir():
     )
 
 
-# PostgreSQL connection
+# ==========================================
+# DATABASE CONNECTION
+# ==========================================
+
 def get_database_url():
+
     url = os.getenv("DATABASE_URL")
 
     if url and url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1)
+        url = url.replace(
+            "postgres://",
+            "postgresql://",
+            1
+        )
 
     return url
 
 
-# Create database tables
+# ==========================================
+# CREATE DATABASE TABLES
+# ==========================================
+
 def create_database_tables():
+
     database_url = get_database_url()
 
     if not database_url:
@@ -60,6 +81,7 @@ def create_database_tables():
         return False
 
     sql_commands = [
+
         """
         CREATE TABLE IF NOT EXISTS wards (
             id BIGSERIAL PRIMARY KEY,
@@ -69,6 +91,7 @@ def create_database_tables():
             created_at TIMESTAMPTZ DEFAULT NOW()
         )
         """,
+
         """
         CREATE TABLE IF NOT EXISTS shops (
             id BIGSERIAL PRIMARY KEY,
@@ -82,6 +105,7 @@ def create_database_tables():
             created_at TIMESTAMPTZ DEFAULT NOW()
         )
         """,
+
         """
         CREATE TABLE IF NOT EXISTS products (
             id BIGSERIAL PRIMARY KEY,
@@ -92,6 +116,7 @@ def create_database_tables():
             created_at TIMESTAMPTZ DEFAULT NOW()
         )
         """,
+
         """
         CREATE TABLE IF NOT EXISTS prices (
             id BIGSERIAL PRIMARY KEY,
@@ -103,14 +128,17 @@ def create_database_tables():
             updated_at TIMESTAMPTZ DEFAULT NOW()
         )
         """,
+
         """
         CREATE INDEX IF NOT EXISTS idx_shops_ward
         ON shops(ward_id)
         """,
+
         """
         CREATE INDEX IF NOT EXISTS idx_products_category
         ON products(category)
         """,
+
         """
         CREATE INDEX IF NOT EXISTS idx_prices_product
         ON prices(product_id)
@@ -118,35 +146,68 @@ def create_database_tables():
     ]
 
     try:
+
         with psycopg.connect(
             database_url,
             connect_timeout=10
         ) as connection:
 
             with connection.cursor() as cursor:
+
+                # Create all database tables
                 for command in sql_commands:
                     cursor.execute(command)
 
-        print("BezawadaDeals database tables are ready.")
+                # Insert Ward Numbers 1 to 86
+                cursor.execute("""
+                    INSERT INTO wards (
+                        ward_number,
+                        area_name,
+                        is_active
+                    )
+                    SELECT
+                        ward_no,
+                        'Area details pending',
+                        TRUE
+                    FROM generate_series(1, 86) AS ward_no
+                    ON CONFLICT (ward_number)
+                    DO NOTHING
+                """)
+
+            connection.commit()
+
+        print("Database tables created successfully.")
+        print("Vijayawada Ward Numbers 1 to 86 are ready.")
+
         return True
 
     except Exception as error:
+
         print("Database setup error:", str(error))
         traceback.print_exc()
+
         return False
 
 
-# Initialize database when application starts
+# ==========================================
+# APPLICATION STARTUP
+# ==========================================
+
 @app.on_event("startup")
 async def startup_event():
+
     create_database_tables()
 
 
-# Homepage
+# ==========================================
+# HOMEPAGE
+# ==========================================
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
 
     if TEMPLATE_DIR is None:
+
         return HTMLResponse(
             "<h1>Templates folder not found</h1>",
             status_code=500
@@ -155,12 +216,14 @@ async def home(request: Request):
     index_file = TEMPLATE_DIR / "index.html"
 
     if not index_file.is_file():
+
         return HTMLResponse(
             "<h1>index.html not found</h1>",
             status_code=500
         )
 
     try:
+
         return templates.TemplateResponse(
             request=request,
             name="index.html",
@@ -168,6 +231,7 @@ async def home(request: Request):
         )
 
     except Exception:
+
         traceback.print_exc()
 
         return HTMLResponse(
@@ -177,31 +241,43 @@ async def home(request: Request):
         )
 
 
-# Health check
+# ==========================================
+# HEALTH CHECK
+# ==========================================
+
 @app.get("/health")
 async def health():
+
     return {
         "status": "online",
         "website": "BezawadaDeals"
     }
 
 
-# API status
+# ==========================================
+# API STATUS
+# ==========================================
+
 @app.get("/api/status")
 async def api_status():
+
     return {
         "success": True,
         "message": "BezawadaDeals Backend is running"
     }
 
 
-# Database connection test
+# ==========================================
+# DATABASE CONNECTION STATUS
+# ==========================================
+
 @app.get("/api/db-status")
 async def database_status():
 
     database_url = get_database_url()
 
     if not database_url:
+
         return {
             "success": False,
             "database": "not configured",
@@ -209,12 +285,14 @@ async def database_status():
         }
 
     try:
+
         with psycopg.connect(
             database_url,
             connect_timeout=10
         ) as connection:
 
             with connection.cursor() as cursor:
+
                 cursor.execute("SELECT version()")
                 version = cursor.fetchone()[0]
 
@@ -225,7 +303,10 @@ async def database_status():
                     ORDER BY table_name
                 """)
 
-                tables = [row[0] for row in cursor.fetchall()]
+                tables = [
+                    row[0]
+                    for row in cursor.fetchall()
+                ]
 
         return {
             "success": True,
@@ -235,7 +316,8 @@ async def database_status():
         }
 
     except Exception as error:
-        print("Database connection test error:", str(error))
+
+        print("Database connection error:", str(error))
 
         return {
             "success": False,
@@ -244,14 +326,85 @@ async def database_status():
         }
 
 
-# Check project files
+# ==========================================
+# VIJAYAWADA 86 WARDS API
+# ==========================================
+
+@app.get("/api/wards")
+async def get_wards():
+
+    database_url = get_database_url()
+
+    if not database_url:
+
+        return {
+            "success": False,
+            "message": "DATABASE_URL is missing"
+        }
+
+    try:
+
+        with psycopg.connect(
+            database_url,
+            connect_timeout=10
+        ) as connection:
+
+            with connection.cursor() as cursor:
+
+                cursor.execute("""
+                    SELECT
+                        ward_number,
+                        area_name,
+                        is_active
+                    FROM wards
+                    WHERE is_active = TRUE
+                    ORDER BY ward_number ASC
+                """)
+
+                rows = cursor.fetchall()
+
+        return {
+            "success": True,
+            "total_wards": len(rows),
+            "wards": [
+                {
+                    "ward_number": row[0],
+                    "area_name": row[1],
+                    "is_active": row[2]
+                }
+                for row in rows
+            ]
+        }
+
+    except Exception as error:
+
+        print("Ward API error:", str(error))
+
+        return {
+            "success": False,
+            "message": str(error)
+        }
+
+
+# ==========================================
+# PROJECT FILE CHECK
+# ==========================================
+
 @app.get("/api/check")
 async def check_files():
+
     return {
-        "templates_folder": str(TEMPLATE_DIR) if TEMPLATE_DIR else None,
+
+        "templates_folder": (
+            str(TEMPLATE_DIR)
+            if TEMPLATE_DIR else None
+        ),
+
         "index_html_exists": (
             (TEMPLATE_DIR / "index.html").is_file()
             if TEMPLATE_DIR else False
         ),
+
         "public_folder_exists": PUBLIC_DIR.is_dir()
+
     }
