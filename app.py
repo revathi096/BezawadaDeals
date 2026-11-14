@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 app = FastAPI(
     title="BezawadaDeals",
     description="Vijayawada Local Shopping Marketplace",
-    version="3.0.0"
+    version="3.1.0"
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -187,8 +187,6 @@ def create_database_tables():
         )
         """,
 
-        # Safe migrations
-
         """
         ALTER TABLE shops
         ADD COLUMN IF NOT EXISTS locality_id BIGINT
@@ -222,8 +220,6 @@ def create_database_tables():
         ADD COLUMN IF NOT EXISTS is_live BOOLEAN
         DEFAULT FALSE
         """,
-
-        # Indexes
 
         """
         CREATE INDEX IF NOT EXISTS idx_shops_ward
@@ -340,7 +336,7 @@ async def health():
     return {
         "status": "online",
         "website": "BezawadaDeals",
-        "version": "3.0.0"
+        "version": "3.1.0"
     }
 
 
@@ -946,7 +942,136 @@ async def check_files():
 
 
 # ==========================================
-# BULK IMPORT: 86 WARDS AND LOCALITIES
+# WARD IMPORT MODELS
+# ==========================================
+
+class WardImportItem(BaseModel):
+
+    ward_number: int = Field(ge=1, le=86)
+
+    area_name: str = Field(
+        min_length=1,
+        max_length=200
+    )
+
+    localities: list[str] = Field(default_factory=list)
+
+
+class WardImportRequest(BaseModel):
+
+    wards: list[WardImportItem]
+
+
+# ==========================================
+# COMMON WARD IMPORT FUNCTION
+# ==========================================
+
+def save_wards_data(data):
+
+    wards = data.wards
+
+    if len(wards) != 86:
+
+        raise HTTPException(
+            status_code=400,
+            detail="JSON must contain exactly 86 wards"
+        )
+
+    ward_numbers = [
+        item.ward_number for item in wards
+    ]
+
+    if sorted(ward_numbers) != list(range(1, 87)):
+
+        raise HTTPException(
+            status_code=400,
+            detail="Ward numbers must be 1 to 86 exactly once"
+        )
+
+    imported_localities = 0
+
+    with get_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            for item in wards:
+
+                ward_number = item.ward_number
+                area_name = item.area_name.strip()
+
+                if not area_name:
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Area name missing for ward {ward_number}"
+                    )
+
+                cursor.execute("""
+                    INSERT INTO wards (
+                        ward_number,
+                        area_name,
+                        is_active
+                    )
+
+                    VALUES (%s, %s, TRUE)
+
+                    ON CONFLICT (ward_number)
+
+                    DO UPDATE SET
+                        area_name = EXCLUDED.area_name,
+                        is_active = TRUE
+
+                    RETURNING id
+                """, (
+                    ward_number,
+                    area_name
+                ))
+
+                ward_id = cursor.fetchone()["id"]
+
+                for locality in item.localities:
+
+                    locality_name = locality.strip()
+
+                    if len(locality_name) < 2:
+                        continue
+
+                    cursor.execute("""
+                        INSERT INTO localities (
+                            ward_id,
+                            locality_name,
+                            is_verified
+                        )
+
+                        VALUES (%s, %s, FALSE)
+
+                        ON CONFLICT (
+                            ward_id,
+                            locality_name
+                        )
+
+                        DO NOTHING
+                    """, (
+                        ward_id,
+                        locality_name
+                    ))
+
+                    if cursor.rowcount > 0:
+                        imported_localities += 1
+
+        connection.commit()
+
+    return {
+        "success": True,
+        "message": "Ward data imported successfully",
+        "wards_processed": 86,
+        "new_localities_added": imported_localities,
+        "verified": False
+    }
+
+
+# ==========================================
+# BULK IMPORT: 86 WARDS - FILE UPLOAD
 # ==========================================
 
 @app.post("/api/admin/import-wards")
@@ -968,132 +1093,68 @@ async def import_wards(
 
         content = await file.read()
 
-        data = json.loads(
-            content.decode("utf-8")
-        )
+        if not content:
+            raise HTTPException(
+                status_code=400,
+                detail="Uploaded JSON file is empty"
+            )
 
-        ward_list = data.get("wards", [])
+        try:
+            raw_data = json.loads(
+                content.decode("utf-8-sig")
+            )
 
-        if not isinstance(ward_list, list) or len(ward_list) != 86:
+            validated_data = WardImportRequest(**raw_data)
+
+        except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
 
             raise HTTPException(
                 status_code=400,
-                detail="JSON must contain exactly 86 wards"
-            )
+                detail="Invalid JSON file or ward data"
+            ) from error
 
-        ward_numbers = [
-            int(item["ward_number"])
-            for item in ward_list
-        ]
-
-        if sorted(ward_numbers) != list(range(1, 87)):
-
-            raise HTTPException(
-                status_code=400,
-                detail="Ward numbers must be 1 to 86 exactly once"
-            )
-
-        imported_localities = 0
-
-        with get_connection() as connection:
-
-            with connection.cursor() as cursor:
-
-                for item in ward_list:
-
-                    ward_number = int(item["ward_number"])
-
-                    area_name = str(
-                        item.get("area_name", "")
-                    ).strip()
-
-                    localities = item.get("localities", [])
-
-                    if not area_name:
-
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"Area name missing for ward {ward_number}"
-                        )
-
-                    if not isinstance(localities, list):
-
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"Localities must be a list for ward {ward_number}"
-                        )
-
-                    cursor.execute("""
-                        INSERT INTO wards (
-                            ward_number,
-                            area_name,
-                            is_active
-                        )
-
-                        VALUES (%s, %s, TRUE)
-
-                        ON CONFLICT (ward_number)
-
-                        DO UPDATE SET
-                            area_name = EXCLUDED.area_name,
-                            is_active = TRUE
-
-                        RETURNING id
-                    """, (
-                        ward_number,
-                        area_name
-                    ))
-
-                    ward_id = cursor.fetchone()["id"]
-
-                    for locality in localities:
-
-                        locality_name = str(locality).strip()
-
-                        if len(locality_name) < 2:
-                            continue
-
-                        cursor.execute("""
-                            INSERT INTO localities (
-                                ward_id,
-                                locality_name,
-                                is_verified
-                            )
-
-                            VALUES (%s, %s, FALSE)
-
-                            ON CONFLICT (
-                                ward_id,
-                                locality_name
-                            )
-
-                            DO NOTHING
-                        """, (
-                            ward_id,
-                            locality_name
-                        ))
-
-                        if cursor.rowcount > 0:
-                            imported_localities += 1
-
-            connection.commit()
-
-        return {
-            "success": True,
-            "message": "Ward data imported successfully",
-            "wards_processed": 86,
-            "new_localities_added": imported_localities,
-            "verified": False
-        }
+        return save_wards_data(validated_data)
 
     except HTTPException:
         raise
 
-    except Exception as error:
+    except Exception:
 
         traceback.print_exc()
 
         raise HTTPException(
             status_code=500,
-            detail=f"Import failed: {str(error)}"
+            detail="Ward import failed"
+        )
+
+    finally:
+        await file.close()
+
+
+# ==========================================
+# BULK IMPORT: 86 WARDS - DIRECT JSON BODY
+# ==========================================
+
+@app.post("/api/admin/import-wards-json")
+async def import_wards_json(
+    data: WardImportRequest,
+    x_api_key: str | None = Header(default=None)
+):
+
+    check_admin_key(x_api_key)
+
+    try:
+
+        return save_wards_data(data)
+
+    except HTTPException:
+        raise
+
+    except Exception:
+
+        traceback.print_exc()
+
+        raise HTTPException(
+            status_code=500,
+            detail="Ward import failed"
         )
