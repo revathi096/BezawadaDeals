@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field
 app = FastAPI(
     title="BezawadaDeals",
     description="Vijayawada Local Shopping Marketplace",
-    version="4.1.0"
+    version="4.1.1"
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -410,7 +410,7 @@ async def health():
     return {
         "status": "online",
         "website": "BezawadaDeals",
-        "version": "4.1.0"
+        "version": "4.1.1"
     }
 
 
@@ -419,7 +419,7 @@ async def api_status():
     return {
         "success": True,
         "message": "BezawadaDeals backend is running",
-        "version": "4.1.0",
+        "version": "4.1.1",
         "categories": CATEGORIES
     }
 
@@ -438,6 +438,7 @@ async def database_status():
                     ORDER BY table_name
                     """
                 )
+
                 tables = [
                     row["table_name"]
                     for row in cursor.fetchall()
@@ -714,7 +715,6 @@ async def get_shops(
 ):
 
     category = canonical_category(category)
-
     all_categories = category == "All"
 
     search_text = (search or "").strip()
@@ -788,15 +788,15 @@ async def get_shops(
                     )
 
                     AND (
-                        %s IS NULL
-                        OR s.locality_id = %s
+                        %s::BIGINT IS NULL
+                        OR s.locality_id = %s::BIGINT
                     )
 
                     AND (
-                        %s = ''
-                        OR s.shop_name ILIKE %s
-                        OR COALESCE(s.address, '') ILIKE %s
-                        OR COALESCE(l.locality_name, '') ILIKE %s
+                        %s::TEXT = ''
+                        OR s.shop_name ILIKE %s::TEXT
+                        OR COALESCE(s.address, '') ILIKE %s::TEXT
+                        OR COALESCE(l.locality_name, '') ILIKE %s::TEXT
                     )
 
                 ORDER BY s.shop_name
@@ -942,8 +942,8 @@ async def price_tracker(
                     )
 
                     AND (
-                        %s IS NULL
-                        OR LOWER(p.product_name) = LOWER(%s)
+                        %s::TEXT IS NULL
+                        OR LOWER(p.product_name) = LOWER(%s::TEXT)
                     )
 
                 ORDER BY
