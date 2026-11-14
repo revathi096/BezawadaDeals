@@ -1,178 +1,183 @@
-document.addEventListener("DOMContentLoaded", function () {
+(function () {
+    "use strict";
 
-    // Mobile Navigation Menu
-    const menuBtn = document.getElementById("menuBtn");
-    const navLinks = document.querySelector(".nav-links");
+    function initializeWebsite() {
 
-    if (menuBtn && navLinks) {
-        menuBtn.addEventListener("click", function () {
-            navLinks.classList.toggle("active");
-        });
+        // Mobile Navigation
+        const menuBtn = document.getElementById("menuBtn");
+        const navLinks = document.querySelector(".nav-links");
 
-        navLinks.querySelectorAll("a").forEach(link => {
-            link.addEventListener("click", function () {
-                navLinks.classList.remove("active");
+        if (menuBtn && navLinks) {
+            menuBtn.addEventListener("click", function () {
+                navLinks.classList.toggle("active");
             });
-        });
-    }
+        }
 
-    // Ward API Integration
-    const wardSelect = document.getElementById("wardSelect");
-    const wardMessage = document.getElementById("wardMessage");
+        // Ward Elements
+        const wardSelect = document.getElementById("wardSelect");
+        const wardMessage = document.getElementById("wardMessage");
 
-    async function loadWards() {
-        if (!wardSelect) return;
-
-        wardSelect.innerHTML =
-            '<option value="">Loading Vijayawada wards...</option>';
-
-        try {
-            const response = await fetch("/api/wards");
-
-            if (!response.ok) {
-                throw new Error("Ward API request failed");
-            }
-
-            const data = await response.json();
-
-            if (!data.success || !Array.isArray(data.wards)) {
-                throw new Error("Invalid ward data");
+        async function loadWards() {
+            if (!wardSelect) {
+                console.error("wardSelect element not found");
+                return;
             }
 
             wardSelect.innerHTML =
-                '<option value="">Select Ward / Area</option>';
+                '<option value="">Loading Vijayawada wards...</option>';
 
-            data.wards.forEach(ward => {
-                const option = document.createElement("option");
+            try {
+                const response = await fetch("/api/wards", {
+                    method: "GET",
+                    cache: "no-store"
+                });
 
-                option.value = ward.ward_number;
+                if (!response.ok) {
+                    throw new Error("API Error: " + response.status);
+                }
 
-                const area = ward.area_name || "Area name pending";
+                const data = await response.json();
 
-                option.textContent =
-                    "Ward " + ward.ward_number + " — " + area;
+                if (!data.success || !Array.isArray(data.wards)) {
+                    throw new Error("Invalid API response");
+                }
 
-                wardSelect.appendChild(option);
-            });
+                wardSelect.innerHTML =
+                    '<option value="">Select Ward / Area</option>';
 
-            if (wardMessage) {
-                wardMessage.textContent =
-                    data.total_wards + " ward records loaded successfully.";
-            }
+                data.wards.forEach(function (ward) {
+                    const option = document.createElement("option");
 
-        } catch (error) {
-            console.error("Ward loading error:", error);
+                    option.value = ward.ward_number;
 
-            wardSelect.innerHTML =
-                '<option value="">Unable to load wards. Refresh page.</option>';
+                    const area = ward.area_name &&
+                        ward.area_name !== "Area details pending"
+                        ? ward.area_name
+                        : "Area details pending";
 
-            if (wardMessage) {
-                wardMessage.textContent =
-                    "Ward details could not be loaded. Please try again.";
+                    option.textContent =
+                        "Ward " + ward.ward_number + " — " + area;
+
+                    wardSelect.appendChild(option);
+                });
+
+                if (wardMessage) {
+                    wardMessage.textContent =
+                        data.total_wards + " Vijayawada wards loaded.";
+                }
+
+                console.log("Ward data loaded:", data.total_wards);
+
+            } catch (error) {
+                console.error("Ward API Error:", error);
+
+                wardSelect.innerHTML =
+                    '<option value="">Unable to load wards</option>';
+
+                if (wardMessage) {
+                    wardMessage.textContent =
+                        "Unable to load ward details. Please refresh.";
+                }
             }
         }
-    }
 
-    loadWards();
+        loadWards();
 
-    // Ward Selection
-    window.selectWard = function () {
-        if (!wardSelect || !wardMessage) return;
+        // Ward Selection
+        window.selectWard = function () {
+            if (!wardSelect) return;
 
-        const selectedOption =
-            wardSelect.options[wardSelect.selectedIndex];
+            const selected = wardSelect.options[
+                wardSelect.selectedIndex
+            ];
 
-        if (!wardSelect.value) {
-            wardMessage.textContent = "";
-            return;
-        }
+            if (wardMessage) {
+                wardMessage.textContent = wardSelect.value
+                    ? "Selected: " + selected.textContent
+                    : "";
+            }
+        };
 
-        wardMessage.textContent =
-            "Selected: " + selectedOption.textContent;
-    };
+        // Category Selection
+        window.showCategory = function (category) {
+            const results = document.getElementById("results");
+            if (!results) return;
 
-    // Category Selection
-    window.showCategory = function (category) {
-        const results = document.getElementById("results");
+            results.innerHTML = "";
 
-        if (!results) return;
+            const card = document.createElement("div");
+            card.className = "result-card";
 
-        const selectedWard = wardSelect
-            ? wardSelect.value
-            : "";
-
-        results.innerHTML = "";
-
-        const card = document.createElement("div");
-        card.className = "result-card";
-
-        const heading = document.createElement("h3");
-        heading.textContent = category;
-
-        const wardInfo = document.createElement("p");
-        wardInfo.textContent = selectedWard
-            ? "Selected Ward: " + selectedWard
-            : "Please select your Ward / Area.";
-
-        const message = document.createElement("p");
-        message.textContent =
-            "Verified shop and product listings will appear here once they are added to the database.";
-
-        card.append(heading, wardInfo, message);
-        results.appendChild(card);
-
-        document.getElementById("offers").scrollIntoView({
-            behavior: "smooth"
-        });
-    };
-
-    // Search Functionality
-    window.searchItems = function () {
-        const searchInput =
-            document.getElementById("searchInput");
-
-        const results =
-            document.getElementById("results");
-
-        if (!searchInput || !results) return;
-
-        const query = searchInput.value.trim();
-
-        results.innerHTML = "";
-
-        const card = document.createElement("div");
-        card.className = "result-card";
-
-        if (!query) {
-            card.textContent =
-                "Please enter a product, shop or category name.";
-        } else {
             const heading = document.createElement("h3");
-            heading.textContent = "Search: " + query;
+            heading.textContent = category;
+
+            const info = document.createElement("p");
+            info.textContent = wardSelect && wardSelect.value
+                ? "Selected Ward: " + wardSelect.value
+                : "Please select your Ward / Area first.";
 
             const message = document.createElement("p");
             message.textContent =
-                "Product and shop database search is not connected yet. No unverified results are displayed.";
+                "Verified shop and price data will appear here when available.";
 
-            card.append(heading, message);
-        }
+            card.append(heading, info, message);
+            results.appendChild(card);
 
-        results.appendChild(card);
-
-        document.getElementById("offers").scrollIntoView({
-            behavior: "smooth"
-        });
-    };
-
-    const searchInput =
-        document.getElementById("searchInput");
-
-    if (searchInput) {
-        searchInput.addEventListener("keydown", function (event) {
-            if (event.key === "Enter") {
-                window.searchItems();
+            const offers = document.getElementById("offers");
+            if (offers) {
+                offers.scrollIntoView({ behavior: "smooth" });
             }
-        });
+        };
+
+        // Search
+        window.searchItems = function () {
+            const searchInput =
+                document.getElementById("searchInput");
+
+            const results = document.getElementById("results");
+
+            if (!searchInput || !results) return;
+
+            const query = searchInput.value.trim();
+
+            results.innerHTML = "";
+
+            const card = document.createElement("div");
+            card.className = "result-card";
+
+            if (!query) {
+                card.textContent =
+                    "Please enter a product, shop or category name.";
+            } else {
+                const heading = document.createElement("h3");
+                heading.textContent = "Search: " + query;
+
+                const message = document.createElement("p");
+                message.textContent =
+                    "No verified matching shop or product data is available yet.";
+
+                card.append(heading, message);
+            }
+
+            results.appendChild(card);
+        };
+
+        const searchInput =
+            document.getElementById("searchInput");
+
+        if (searchInput) {
+            searchInput.addEventListener("keydown", function (event) {
+                if (event.key === "Enter") {
+                    window.searchItems();
+                }
+            });
+        }
     }
 
-});
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initializeWebsite);
+    } else {
+        initializeWebsite();
+    }
+
+})();
