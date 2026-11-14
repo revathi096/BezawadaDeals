@@ -1,6 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>BezawadaDeals | Vijayawada Local Shopping</title>
+    <meta name="description" content="Explore Vijayawada shops, local markets and live price comparisons area-wise.">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background: #f5f8f5;
+            color: #222;
+        }
+
+        header {
+            background: #087443;
+            color: white;
+            padding: 18px 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        header h2 { font-size: 23px; }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin: 8px;
+            font-weight: bold;
+        }
+
+        .hero {
+            text-align: center;
+            padding: 55px 15px;
+            background: linear-gradient(120deg, #087443, #20a66b);
+            color: white;
+        }
+
+        .hero h1 {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+
+        .hero p { margin-bottom: 20px; }
+
+        .search {
+            max-width: 550px;
+            margin: auto;
+            display: flex;
+            gap: 8px;
+        }
+
+        input, select, button {
+            padding: 13px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+        }
+
+        .search input { flex: 1; min-width: 0; }
+
+        button {
+            background: #ffb300;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        section { padding: 30px 5%; }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 22px;
+            color: #087443;
+        }
+
+        .ward-box {
+            max-width: 650px;
+            margin: auto;
+            background: white;
+            padding: 22px;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px #00000010;
+        }
+
+        .ward-box select {
+            width: 100%;
+            margin-top: 12px;
+        }
+
+        #wardMessage {
+            margin-top: 12px;
+            color: #087443;
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+            gap: 15px;
+        }
+
+        .category-card {
+            background: white;
+            border-radius: 12px;
+            padding: 22px 10px;
+            text-align: center;
+            box-shadow: 0 3px 12px #00000010;
+            cursor: pointer;
+            border: 1px solid #e5eee8;
+            font-weight: bold;
+        }
+
+        .category-card:hover {
+            background: #e7f7ed;
+            transform: translateY(-3px);
+        }
+
+        .category-card span {
+            display: block;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        #results {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            min-height: 90px;
+        }
+
+        footer {
+            background: #075b36;
+            color: white;
+            text-align: center;
+            padding: 22px;
+            margin-top: 25px;
+        }
+
+        @media(max-width:600px) {
+            header { justify-content: center; text-align: center; }
+            .hero h1 { font-size: 25px; }
+            .search { flex-direction: column; }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h2>🛍️ BezawadaDeals</h2>
+    <nav>
+        <a href="/">Home</a>
+        <a href="#wards">Select Area</a>
+        <a href="#categories">Categories</a>
+        <a href="#offers">Price Tracker</a>
+    </nav>
+</header>
+
+<div class="hero">
+    <h1>Vijayawada Shopping Made Easy!</h1>
+    <p>Find nearby shops and compare prices in your area.</p>
+
+    <div class="search">
+        <input id="searchInput" type="text"
+               placeholder="Search products or shops...">
+        <button onclick="searchItems()">Search</button>
+    </div>
+</div>
+
+<section id="wards">
+    <h2 class="section-title">📍 Select Your Area</h2>
+
+    <div class="ward-box">
+        <label for="wardSelect"><b>Choose your Vijayawada Ward / Area</b></label>
+
+        <select id="wardSelect" onchange="selectWard()">
+            <option value="">Loading ward details...</option>
+        </select>
+
+        <p id="wardMessage">Loading ward data...</p>
+    </div>
+</section>
+
+<section id="categories">
+    <h2 class="section-title">Explore Categories</h2>
+
+    <div class="category-grid">
+        <div class="category-card" onclick="showCategory('Vegetables')"><span>🥦</span>Vegetables</div>
+        <div class="category-card" onclick="showCategory('Fruits')"><span>🍎</span>Fruits</div>
+        <div class="category-card" onclick="showCategory('Groceries')"><span>🛒</span>Groceries</div>
+        <div class="category-card" onclick="showCategory('Supermarkets')"><span>🏬</span>Supermarkets</div>
+        <div class="category-card" onclick="showCategory('Shopping Malls')"><span>🛍️</span>Shopping Malls</div>
+        <div class="category-card" onclick="showCategory('Restaurants')"><span>🍽️</span>Restaurants</div>
+        <div class="category-card" onclick="showCategory('Electronics')"><span>📱</span>Electronics</div>
+        <div class="category-card" onclick="showCategory('Fashion')"><span>👗</span>Fashion</div>
+        <div class="category-card" onclick="showCategory('Accessories')"><span>⌚</span>Accessories</div>
+        <div class="category-card" onclick="showCategory('Medical Stores')"><span>💊</span>Medical Stores</div>
+        <div class="category-card" onclick="showCategory('Local Services')"><span>🔧</span>Local Services</div>
+    </div>
+</section>
+
+<section id="offers">
+    <h2 class="section-title">🔴 Shop Price Tracker</h2>
+    <div id="results">
+        Select your area and category to explore.
+    </div>
+</section>
+
+<section id="about">
+    <h2 class="section-title">About BezawadaDeals</h2>
+    <p style="text-align:center">
+        Your local Vijayawada shopping and price comparison platform.
+    </p>
+</section>
+
+<footer>
+    <p>© 2026 BezawadaDeals | Vijayawada</p>
+</footer>
+
 <script src="/static/js/script.js" defer></script>
 
 </body>
 </html>
-
-
