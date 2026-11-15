@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="te">
 <head>
@@ -86,30 +85,11 @@ footer{text-align:center;padding:20px;color:#64748b}
 </section>
 </main>
 
-<footer>
-BezawadaDeals | Vijayawada Price Tracker
-</footer>
+<footer>BezawadaDeals | Vijayawada Price Tracker</footer>
 
 <script>
 const API = "";
-const CATEGORIES = [
-"Vegetables","Fruits","Groceries","Rice & Pulses",
-"Dairy & Bakery","Meat & Seafood","Supermarkets",
-"Wholesale Stores","Shopping Malls","Department Stores",
-"Restaurants","Fast Food","Cafes & Tea","Juice & Ice Cream",
-"Sweets & Bakeries","Electronics","Mobile Stores","Computers",
-"Home Appliances","Fashion & Clothing","Footwear","Bags",
-"Jewellery","Accessories","Cosmetics","Medical Stores",
-"Hospitals & Clinics","Optical Stores","Petrol Bunks",
-"Auto Sales & Repair","Hardware","Electrical Stores",
-"Furniture","Home & Kitchen","Books & Stationery",
-"Toys & Baby Products","Sports & Fitness","Flowers","Gifts",
-"Salons & Beauty","Laundry","Photo & Printing","Banks & ATMs",
-"Internet & Mobile Services","Repairs & Services",
-"Education & Coaching","Travel & Transport","Local Services",
-"Pet Shops","Other Shops"
-];
-
+let CATEGORIES = [];
 let selectedCategory = "";
 let allPrices = [];
 
@@ -122,18 +102,31 @@ function escapeHTML(value){
 }
 
 async function api(path){
- const response = await fetch(API + path);
+ const response = await fetch(API + path, {
+  headers: {"Accept":"application/json"}
+ });
  if(!response.ok) throw new Error("API Error: " + response.status);
  return response.json();
 }
 
-function getRows(data){
+function getRows(data, key){
  if(Array.isArray(data)) return data;
+ if(key && Array.isArray(data[key])) return data[key];
  if(Array.isArray(data.items)) return data.items;
  if(Array.isArray(data.results)) return data.results;
- if(Array.isArray(data.prices)) return data.prices;
  if(Array.isArray(data.data)) return data.data;
  return [];
+}
+
+async function loadCategories(){
+ try{
+  const data = await api("/api/categories");
+  const names = getRows(data,"categories");
+  if(names.length) CATEGORIES = names;
+ }catch(error){
+  console.error("Categories:",error);
+ }
+ renderCategories();
 }
 
 function renderCategories(){
@@ -155,14 +148,38 @@ function renderCategories(){
  });
 }
 
+async function loadWards(){
+ try{
+  const data = await api("/api/wards");
+  const wards = getRows(data,"wards");
+  $("ward").innerHTML = '<option value="">All Wards</option>';
+
+  wards.forEach(w=>{
+   const number = w.ward_number ?? w.number;
+   if(number==null) return;
+   const option = document.createElement("option");
+   option.value = String(number);
+   option.textContent = w.ward_name || "Ward " + number;
+   $("ward").appendChild(option);
+  });
+
+  if(!wards.length){
+   $("ward").innerHTML='<option value="">Ward data unavailable</option>';
+  }
+ }catch(error){
+  $("ward").innerHTML='<option value="">Ward API unavailable</option>';
+  console.error("Wards:",error);
+ }
+}
+
 function renderPrices(){
  const search = $("search").value.trim().toLowerCase();
  const ward = $("ward").value;
 
  let rows = allPrices.filter(p=>{
-  const category = String(p.category || p.product_category || "");
-  const name = String(p.product_name || p.product || p.name || "");
-  const wardNumber = String(p.ward_number ?? p.ward ?? "");
+  const category = String(p.category || "");
+  const name = String(p.product_name || "");
+  const wardNumber = String(p.ward_number ?? "");
 
   return (!selectedCategory ||
    category.toLowerCase()===selectedCategory.toLowerCase()) &&
@@ -171,8 +188,8 @@ function renderPrices(){
  });
 
  rows.sort((a,b)=>{
-  const x = Number(a.price ?? a.price_per_unit ?? 0);
-  const y = Number(b.price ?? b.price_per_unit ?? 0);
+  const x = Number(a.price ?? 0);
+  const y = Number(b.price ?? 0);
   return $("sort").value==="asc" ? x-y : y-x;
  });
 
@@ -181,144 +198,113 @@ function renderPrices(){
 
  if(!rows.length){
   $("results").innerHTML =
-   '<div class="empty">ఈ ఎంపికకు ధరలు అందుబాటులో లేవు. Shop owner update వచ్చినప్పుడు ఇక్కడ కనిపిస్తాయి.</div>';
+   '<div class="empty">ఈ ఎంపికకు ధరలు అందుబాటులో లేవు. Shop owner update వచ్చినప్పుడు కనిపిస్తాయి.</div>';
   return;
  }
 
- $("results").innerHTML = rows.map(p=>{
-  const name = p.product_name || p.product || p.name || "Product";
-  const price = p.price ?? p.price_per_unit;
-  const unit = p.unit || "unit";
-  const shop = p.shop_name || p.shop || "";
-  const location = p.ward_name ||
-   (p.ward_number ? "Ward " + p.ward_number : "Vijayawada");
-  const status = p.status || p.price_status || "Estimated";
-
-  return `
+ $("results").innerHTML = rows.map(p=>`
   <article class="item">
    <div class="row">
-    <b>${escapeHTML(name)}</b>
-    <span class="status">${escapeHTML(status)}</span>
+    <b>${escapeHTML(p.product_name)}</b>
+    <span class="status">${escapeHTML(p.status || "Estimated")}</span>
    </div>
    <div class="price">
-    ${price==null ? "Price unavailable" : "₹"+escapeHTML(price)}
-    <small class="muted">/ ${escapeHTML(unit)}</small>
+    ₹${escapeHTML(p.price)}
+    <small class="muted">/ ${escapeHTML(p.unit || "unit")}</small>
    </div>
-   <div class="muted">${escapeHTML(shop)} ${shop?"· ":""}${escapeHTML(location)}</div>
-   <div class="muted">Updated: ${escapeHTML(p.updated_at || p.date || "Not specified")}</div>
-  </article>`;
- }).join("");
+   <div class="muted">
+    ${escapeHTML(p.shop_name || "")}
+    · Ward ${escapeHTML(p.ward_number ?? "")}
+   </div>
+   <div class="muted">Updated: ${escapeHTML(p.updated_at || "Not specified")}</div>
+  </article>
+ `).join("");
 }
 
 async function loadPrices(){
  $("results").innerHTML='<div class="empty">Loading prices...</div>';
-
  try{
-  let data;
-  try{
-   data = await api("/api/unified-price-tracker");
-  }catch(error){
-   data = await api("/api/price-tracker");
-  }
+  const params = new URLSearchParams();
+  if(selectedCategory) params.set("category",selectedCategory);
+  if($("ward").value) params.set("ward_number",$("ward").value);
 
-  allPrices = getRows(data);
+  const data = await api("/api/unified-price-tracker?" + params.toString());
+  allPrices = getRows(data,"prices");
   $("apiStatus").textContent = "API Connected";
   renderPrices();
  }catch(error){
   $("apiStatus").textContent = "API Unavailable";
-  $("results").innerHTML =
-   '<div class="empty">Price API అందుబాటులో లేదు. Refresh చేయండి.</div>';
- }
-}
-
-async function loadWards(){
- try{
-  const data = await api("/api/wards");
-  const wards = getRows(data);
-
-  wards.forEach(w=>{
-   const number = w.ward_number ?? w.number ?? w.id;
-   if(number==null) return;
-
-   const option = document.createElement("option");
-   option.value = String(number);
-   option.textContent = w.ward_name || "Ward " + number;
-   $("ward").appendChild(option);
-  });
- }catch(error){
-  console.log("Ward loading failed",error);
+  $("results").innerHTML='<div class="empty">Price API అందుబాటులో లేదు.</div>';
+  console.error("Prices:",error);
  }
 }
 
 async function loadMarket(){
  try{
   const data = await api("/api/market-prices");
-  const rows = getRows(data);
+  const rows = getRows(data,"prices");
 
   if(!rows.length){
-   $("market").innerHTML =
-    '<div class="empty">Government market feed data ప్రస్తుతం అందుబాటులో లేదు.</div>';
+   $("market").innerHTML='<div class="empty">'+
+    escapeHTML(data.message || "Government market feed data అందుబాటులో లేదు.")+
+    '</div>';
    return;
   }
 
-  $("market").innerHTML = rows.slice(0,20).map(p=>`
+  $("market").innerHTML = rows.map(p=>`
    <article class="item">
-    <b>${escapeHTML(p.commodity || p.product || p.name || "Commodity")}</b>
-    <div class="price">₹${escapeHTML(p.modal_price ?? p.price ?? "—")}</div>
-    <div class="muted">
-     ${escapeHTML(p.market || p.market_name || "Market")}
-     · ${escapeHTML(p.date || p.arrival_date || "")}
-    </div>
+    <b>${escapeHTML(p.commodity || "Commodity")}</b>
+    <div class="price">₹${escapeHTML(p.modal_price ?? "—")}</div>
+    <div class="muted">${escapeHTML(p.market || "")} · ${escapeHTML(p.arrival_date || "")}</div>
+    <div class="muted">Per quintal · Government wholesale</div>
    </article>
   `).join("");
  }catch(error){
-  $("market").innerHTML =
-   '<div class="empty">Government market feed unavailable.</div>';
+  $("market").innerHTML='<div class="empty">Government market feed unavailable.</div>';
+  console.error("Market:",error);
  }
 }
 
 async function loadOffers(){
  try{
   const data = await api("/api/offers");
-  const rows = getRows(data);
+  const rows = getRows(data,"offers");
 
   if(!rows.length){
-   $("offers").innerHTML =
-    '<div class="empty">ప్రస్తుతం offers అందుబాటులో లేవు.</div>';
+   $("offers").innerHTML='<div class="empty">ప్రస్తుతం offers అందుబాటులో లేవు.</div>';
    return;
   }
 
   $("offers").innerHTML = rows.map(o=>`
    <article class="item">
-    <b>${escapeHTML(o.title || o.offer_title || o.product_name || "Offer")}</b>
-    <p>${escapeHTML(o.description || o.offer_description || "")}</p>
+    <b>${escapeHTML(o.title)}</b>
+    <p>${escapeHTML(o.description || "")}</p>
+    <div class="price">${escapeHTML(o.discount_text || "")}</div>
     <div class="muted">${escapeHTML(o.shop_name || "Local Shop")}</div>
    </article>
   `).join("");
  }catch(error){
-  $("offers").innerHTML =
-   '<div class="empty">Offers ప్రస్తుతం అందుబాటులో లేవు.</div>';
+  $("offers").innerHTML='<div class="empty">Offers API unavailable.</div>';
+  console.error("Offers:",error);
  }
 }
 
+async function refreshAll(){
+ await Promise.allSettled([
+  loadWards(),
+  loadCategories(),
+  loadPrices(),
+  loadMarket(),
+  loadOffers()
+ ]);
+}
+
 $("search").addEventListener("input",renderPrices);
-$("ward").addEventListener("change",renderPrices);
+$("ward").addEventListener("change",loadPrices);
 $("sort").addEventListener("change",renderPrices);
+$("refresh").addEventListener("click",refreshAll);
 
-$("refresh").addEventListener("click",()=>{
- loadPrices();
- loadMarket();
- loadOffers();
-});
-
-renderCategories();
-
-Promise.all([
- loadWards(),
- loadPrices(),
- loadMarket(),
- loadOffers()
-]);
+refreshAll();
 </script>
 </body>
 </html>
