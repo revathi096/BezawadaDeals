@@ -1,1574 +1,243 @@
-import os
-import json
-import secrets
-import traceback
-import urllib.request
-import urllib.parse
-from pathlib import Path
+import os, json, secrets, urllib.parse, urllib.request
+from datetime import datetime, timezone, timedelta
 from typing import Optional
-from datetime import datetime, timezone
 
 import psycopg
 from psycopg.rows import dict_row
-from fastapi import (
-    FastAPI, Request, Header, HTTPException, Query,
-    UploadFile, File
-)
+from fastapi import FastAPI, HTTPException, Header, Query
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field
+from fastapi import Request
 
-
-# ==========================================================
-# BEZAWADADEALS CONFIGURATION
-# ==========================================================
-
-APP_VERSION = "9.0.0"
+APP_VERSION = "10.0.0"
 TOTAL_WARDS = 86
-MAX_IMPORT_SHOPS = 1000
-
-DATA_GOV_RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
-DATA_GOV_API_URL = (
-    "https://api.data.gov.in/resource/" + DATA_GOV_RESOURCE_ID
-)
-AGMARKNET_SOURCE = "Government of India - AGMARKNET"
-
-# Only these source types are allowed for official feed imports.
-OFFICIAL_SOURCE_TYPES = {
-    "government",
-    "official_retailer",
-    "official_market"
-}
-
-WARD_AREA_NAMES = {
-    1: "Ramavarappadu / Inner Ring Road",
-    2: "ESI Hospital / Loyola College",
-    3: "Polytechnic Signal / Chandramoulipuram",
-    4: "Mythri Nagar / Gunadala Hill",
-    5: "Gunadala Centre / Bethlehem Nagar",
-    6: "Padavalarevu / Machavaram Hill",
-    7: "Karl Marx Road / Moghalrajpuram",
-    8: "Moghalrajpuram / Water Tank Road",
-    9: "Ashok Nagar / Sikhamani Centre",
-    10: "Sikhamani Centre / Krishnalanka",
-    11: "Mother Teresa Junction / PVP Road",
-    12: "Chandramoulipuram / Bandar Road",
-    13: "Benz Circle / Gurunanak Colony",
-    14: "Gurunanak Colony / Fun Times Road",
-    15: "Auto Nagar / Mahanadu Road",
-    16: "Ramavarappadu Junction / Currency Nagar",
-    17: "Auto Nagar / Kanuru Donka",
-    18: "Chowdary Peta / Yenamalakuduru",
-    19: "Chowdary Peta / JD Nagar",
-    20: "JD Nagar / NSM School",
-    21: "Bandar Road / NSM School",
-    22: "Putta Road / Krishna River",
-    23: "Geetha Nagar / Krishna River",
-    24: "Bhupesh Gupta Nagar / Balaji Nagar",
-    25: "Taraka Rama Nagar / Krishna River",
-    26: "Taraka Rama Nagar / Kanaka Durga Varadhi",
-    27: "Ranadheer Nagar / Dwaraka Nagar",
-    30: "Krishna Lanka / Rythu Bazar",
-    31: "Bus Stand Road / Indrakeeladri",
-    32: "Durga Ghat / RTC Workshop Road",
-    33: "Berm Park / Gollapudi",
-    34: "Manava Mandir / Swathi Centre",
-    37: "Sitara Junction / Church Centre",
-    38: "Housing Board Colony / Swathi Centre",
-    40: "Joji Nagar / Kabela Road",
-    41: "Gollapudi Bypass / JNNURM Apartments",
-    42: "Milk Factory / Rajarajeswaripeta",
-    43: "Deen Dayal Nagar / Tannerpet",
-    45: "KT Road / Indrakeeladri",
-    46: "Nehru Bomma Centre / Kanaka Durga Temple",
-    47: "Hindu High School / KT Road",
-    48: "Lenin Bhavan / Park Road",
-    49: "Main Bazaar / KT Road",
-    50: "RR Apparao Street / Railway Track",
-    52: "Wynchipeta / KT Road",
-    53: "Yerrakatta Road / Nanne Saheb Street",
-    54: "KL Rao Nagar / Wynchipeta",
-    55: "New Rajarajeswari Peta / Lotus Landmark",
-    58: "Railway Station Road / RCM School",
-    59: "Bavajipeta / Tummalapalli Kalakshetram",
-    60: "Besant Road / MG Road",
-    61: "Eat Street / Kaleswara Rao Road",
-    63: "Eluru Road / Besant Road",
-    64: "Gulabi Thota / Bavajipeta",
-    65: "Gunadala / Eluru Road",
-    66: "Gunadala Railway Gate / Devi Nagar",
-    69: "Teachers Colony / Food Junction",
-    70: "Teachers Colony / GS Raju Road",
-    71: "Challapalli Vari Street / GS Raju Road",
-    76: "Ayodhya Nagar / Anna Canteen",
-    77: "Ajith Singh Nagar / Singh Nagar Flyover",
-    78: "Daba Kotla Road / Nunna Road",
-    83: "Rajiv Nagar / Patel Nagar",
-    84: "Kandrika / UDA Colony",
-    85: "Meenakshi Nagar / Kandrika",
-    86: "Kandrika Junction / Pathapadu"
-}
-
+AGMARKNET_RESOURCE = "9ef84268-d588-465a-a308-a864a43d0070"
 CATEGORIES = [
-    "Vegetables", "Fruits", "Groceries", "Rice & Pulses",
-    "Dairy & Bakery", "Meat & Seafood", "Supermarkets",
-    "Wholesale Stores", "Shopping Malls", "Department Stores",
-    "Restaurants", "Fast Food", "Cafes & Tea",
-    "Juice & Ice Cream", "Sweets & Bakeries", "Electronics",
-    "Mobile Stores", "Computers", "Home Appliances",
-    "Fashion & Clothing", "Footwear", "Bags", "Jewellery",
-    "Accessories", "Cosmetics", "Medical Stores",
-    "Hospitals & Clinics", "Optical Stores", "Petrol Bunks",
-    "Auto Sales & Repair", "Hardware", "Electrical Stores",
-    "Furniture", "Home & Kitchen", "Books & Stationery",
-    "Toys & Baby Products", "Sports & Fitness", "Flowers",
-    "Gifts", "Salons & Beauty", "Laundry", "Photo & Printing",
-    "Banks & ATMs", "Internet & Mobile Services",
-    "Repairs & Services", "Education & Coaching",
-    "Travel & Transport", "Local Services", "Pet Shops",
-    "Other Shops"
-]
-
-CATEGORY_LOOKUP = {x.casefold(): x for x in CATEGORIES}
+"Vegetables","Fruits","Groceries","Rice & Pulses","Dairy & Bakery","Meat & Seafood","Supermarkets","Wholesale Stores","Shopping Malls","Department Stores","Restaurants","Fast Food","Cafes & Tea","Juice & Ice Cream","Sweets & Bakeries","Electronics","Mobile Stores","Computers","Home Appliances","Fashion & Clothing","Footwear","Bags","Jewellery","Accessories","Cosmetics","Medical Stores","Hospitals & Clinics","Optical Stores","Petrol Bunks","Auto Sales & Repair","Hardware","Electrical Stores","Furniture","Home & Kitchen","Books & Stationery","Toys & Baby Products","Sports & Fitness","Flowers","Gifts","Salons & Beauty","Laundry","Photo & Printing","Banks & ATMs","Internet & Mobile Services","Repairs & Services","Education & Coaching","Travel & Transport","Local Services","Pet Shops","Other Shops"]
+CATEGORY_SET = set(CATEGORIES)
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+API_KEY = os.getenv("DATA_GOV_IN_API_KEY", "")
+app = FastAPI(title="BezawadaDeals", version=APP_VERSION)
+templates = Jinja2Templates(directory="templates")
 
 
-# ==========================================================
-# APPLICATION
-# ==========================================================
-
-app = FastAPI(
-    title="BezawadaDeals",
-    description="Vijayawada Local Shopping and Price Tracker",
-    version=APP_VERSION
-)
-
-BASE_DIR = Path(__file__).resolve().parent
-TEMPLATE_DIR = BASE_DIR / "templates"
-PUBLIC_DIR = BASE_DIR / "public"
-
-templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
-
-if PUBLIC_DIR.is_dir():
-    app.mount(
-        "/static",
-        StaticFiles(directory=str(PUBLIC_DIR)),
-        name="static"
-    )
+def db():
+    if not DATABASE_URL:
+        raise HTTPException(503, "DATABASE_URL environment variable is not configured")
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=10)
 
 
-# ==========================================================
-# COMMON HELPERS
-# ==========================================================
-
-def now_utc():
-    return datetime.now(timezone.utc)
-
-
-def get_database_url():
-    url = os.getenv("DATABASE_URL")
-    if url and url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1)
-    return url
-
-
-def get_connection():
-    url = get_database_url()
-    if not url:
-        raise HTTPException(
-            status_code=503,
-            detail="DATABASE_URL is not configured"
-        )
-    return psycopg.connect(
-        url,
-        connect_timeout=10,
-        row_factory=dict_row
-    )
-
-
-def canonical_category(value):
-    result = CATEGORY_LOOKUP.get((value or "").strip().casefold())
-    if not result:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid category: {value}"
-        )
-    return result
-
-
-def check_admin_key(api_key):
-    expected = os.getenv("PRICE_FEED_API_KEY")
-    if not expected or not api_key:
-        raise HTTPException(status_code=401, detail="Missing API key")
-    if not secrets.compare_digest(expected, api_key):
-        raise HTTPException(status_code=401, detail="Invalid API key")
-
-
-def price_status(in_store_confirmed, valid_until):
-    """Never describe an expired price as current."""
-    if valid_until is not None and valid_until <= now_utc():
-        return "Expired"
-    if in_store_confirmed:
-        return "Verified"
-    return "Estimated"
-
-
-def price_status_description(source_type):
-    if source_type == "shop_owner_confirmed":
-        return "Shop owner confirmed; not a government feed"
-    if source_type == "government":
-        return "Government source"
-    if source_type == "official_retailer":
-        return "Official retailer source"
-    if source_type == "official_market":
-        return "Official market source"
-    return "Source not independently verified"
-
-
-# ==========================================================
-# DATABASE TABLES AND MIGRATIONS
-# ==========================================================
-
-def create_database_tables():
-    commands = [
-        """
-        CREATE TABLE IF NOT EXISTS wards (
-            id BIGSERIAL PRIMARY KEY,
-            ward_number INTEGER UNIQUE NOT NULL,
-            area_name TEXT NOT NULL,
-            is_active BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMPTZ DEFAULT NOW()
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS localities (
-            id BIGSERIAL PRIMARY KEY,
-            ward_id BIGINT NOT NULL REFERENCES wards(id),
-            locality_name TEXT NOT NULL,
-            locality_name_te TEXT,
-            is_verified BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            UNIQUE(ward_id, locality_name)
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS shops (
-            id BIGSERIAL PRIMARY KEY,
-            shop_name TEXT NOT NULL,
-            category TEXT NOT NULL,
-            ward_id BIGINT REFERENCES wards(id),
-            address TEXT,
-            phone TEXT,
-            owner_name TEXT,
-            locality_id BIGINT REFERENCES localities(id),
-            latitude DOUBLE PRECISION,
-            longitude DOUBLE PRECISION,
-            image_url TEXT,
-            is_verified BOOLEAN DEFAULT FALSE,
-            data_connection_status TEXT DEFAULT 'not_connected',
-            shop_update_token TEXT UNIQUE,
-            created_at TIMESTAMPTZ DEFAULT NOW()
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS products (
-            id BIGSERIAL PRIMARY KEY,
-            product_name TEXT NOT NULL,
-            category TEXT NOT NULL,
-            unit TEXT NOT NULL,
-            description TEXT,
-            created_at TIMESTAMPTZ DEFAULT NOW()
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS prices (
-            id BIGSERIAL PRIMARY KEY,
-            shop_id BIGINT REFERENCES shops(id),
-            product_id BIGINT NOT NULL REFERENCES products(id),
-            price NUMERIC(12,2) NOT NULL CHECK(price >= 0),
-            price_type TEXT DEFAULT 'shop_retail',
-            source_name TEXT,
-            source_type TEXT DEFAULT 'manual',
-            is_live BOOLEAN DEFAULT FALSE,
-            in_store_confirmed BOOLEAN DEFAULT FALSE,
-            valid_until TIMESTAMPTZ,
-            updated_at TIMESTAMPTZ DEFAULT NOW()
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS offers (
-            id BIGSERIAL PRIMARY KEY,
-            shop_id BIGINT NOT NULL REFERENCES shops(id)
-                ON DELETE CASCADE,
-            title TEXT NOT NULL,
-            description TEXT,
-            discount_text TEXT,
-            valid_from TIMESTAMPTZ DEFAULT NOW(),
-            valid_until TIMESTAMPTZ,
-            is_active BOOLEAN DEFAULT TRUE,
-            updated_at TIMESTAMPTZ DEFAULT NOW()
-        )
-        """,
-        """
-        ALTER TABLE shops
-        ADD COLUMN IF NOT EXISTS shop_update_token TEXT
-        """,
-        """
-        ALTER TABLE prices
-        ADD COLUMN IF NOT EXISTS in_store_confirmed BOOLEAN DEFAULT FALSE
-        """,
-        """
-        ALTER TABLE prices
-        ADD COLUMN IF NOT EXISTS valid_until TIMESTAMPTZ
-        """,
-        """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_update_token
-        ON shops(shop_update_token)
-        """,
-        """
-        CREATE INDEX IF NOT EXISTS idx_shops_ward
-        ON shops(ward_id)
-        """,
-        """
-        CREATE INDEX IF NOT EXISTS idx_shops_category
-        ON shops(category)
-        """,
-        """
-        CREATE INDEX IF NOT EXISTS idx_prices_shop_product
-        ON prices(shop_id, product_id, updated_at DESC)
-        """,
-        """
-        CREATE INDEX IF NOT EXISTS idx_prices_valid_until
-        ON prices(valid_until)
-        """,
-        """
-        CREATE INDEX IF NOT EXISTS idx_offers_shop
-        ON offers(shop_id, is_active)
-        """
-    ]
-
-    try:
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                for command in commands:
-                    cursor.execute(command)
-
-                for ward_no in range(1, TOTAL_WARDS + 1):
-                    area = WARD_AREA_NAMES.get(
-                        ward_no, f"Ward {ward_no}"
-                    )
-                    cursor.execute(
-                        """
-                        INSERT INTO wards(ward_number, area_name, is_active)
-                        VALUES(%s, %s, TRUE)
-                        ON CONFLICT(ward_number)
-                        DO UPDATE SET
-                            area_name = CASE
-                                WHEN wards.area_name IS NULL
-                                  OR TRIM(wards.area_name) = ''
-                                  OR wards.area_name =
-                                     'Ward ' || wards.ward_number::TEXT
-                                THEN EXCLUDED.area_name
-                                ELSE wards.area_name
-                            END,
-                            is_active = TRUE
-                        """,
-                        (ward_no, area)
-                    )
-            connection.commit()
-
-        print("BezawadaDeals database setup completed")
-        return True
-
-    except Exception as error:
-        print("Database setup error:", error)
-        traceback.print_exc()
-        return False
+def init_db():
+    if not DATABASE_URL:
+        return
+    sql = """
+    CREATE TABLE IF NOT EXISTS wards (id SERIAL PRIMARY KEY, ward_number INTEGER UNIQUE NOT NULL, ward_name TEXT);
+    CREATE TABLE IF NOT EXISTS shops (
+      id BIGSERIAL PRIMARY KEY, shop_name TEXT NOT NULL, category TEXT NOT NULL, ward_id INTEGER REFERENCES wards(id),
+      address TEXT, phone TEXT, owner_name TEXT, locality TEXT, image_url TEXT, is_verified BOOLEAN DEFAULT FALSE,
+      shop_update_token TEXT UNIQUE, created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    ALTER TABLE shops ADD COLUMN IF NOT EXISTS locality TEXT;
+    ALTER TABLE shops ADD COLUMN IF NOT EXISTS shop_update_token TEXT;
+    ALTER TABLE shops ADD COLUMN IF NOT EXISTS owner_name TEXT;
+    ALTER TABLE shops ADD COLUMN IF NOT EXISTS image_url TEXT;
+    ALTER TABLE shops ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
+    CREATE TABLE IF NOT EXISTS products (
+      id BIGSERIAL PRIMARY KEY, product_name TEXT NOT NULL, category TEXT NOT NULL, unit TEXT NOT NULL DEFAULT 'piece',
+      description TEXT
+    );
+    CREATE TABLE IF NOT EXISTS prices (
+      id BIGSERIAL PRIMARY KEY, shop_id BIGINT REFERENCES shops(id) ON DELETE CASCADE,
+      product_id BIGINT REFERENCES products(id), price NUMERIC(12,2) NOT NULL CHECK(price >= 0),
+      price_type TEXT DEFAULT 'retail', source_name TEXT, source_type TEXT NOT NULL,
+      is_live BOOLEAN DEFAULT TRUE, in_store_confirmed BOOLEAN DEFAULT FALSE,
+      valid_until TIMESTAMPTZ, updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS prices_product_updated_idx ON prices(product_id, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS prices_shop_updated_idx ON prices(shop_id, updated_at DESC);
+    CREATE TABLE IF NOT EXISTS offers (
+      id BIGSERIAL PRIMARY KEY, shop_id BIGINT REFERENCES shops(id) ON DELETE CASCADE,
+      title TEXT NOT NULL, description TEXT, discount_text TEXT,
+      valid_from TIMESTAMPTZ DEFAULT NOW(), valid_until TIMESTAMPTZ,
+      is_active BOOLEAN DEFAULT TRUE, updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    """
+    with db() as conn:
+        conn.execute(sql)
+        for n in range(1, TOTAL_WARDS + 1):
+            conn.execute("INSERT INTO wards(ward_number,ward_name) VALUES(%s,%s) ON CONFLICT(ward_number) DO NOTHING", (n, f"Ward {n}"))
 
 
 @app.on_event("startup")
-async def startup_event():
-    create_database_tables()
+def startup():
+    init_db()
 
 
-# ==========================================================
-# WEBSITE AND STATUS
-# ==========================================================
+def status_for(row):
+    if row.get("valid_until") and row["valid_until"] < datetime.now(timezone.utc):
+        return "Expired"
+    if row.get("source_type") == "shop_owner_confirmed" and row.get("in_store_confirmed"):
+        return "Verified"
+    if row.get("source_type") == "agmarknet_wholesale":
+        return "Government wholesale"
+    return "Estimated"
+
 
 @app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    if not (TEMPLATE_DIR / "index.html").is_file():
-        return HTMLResponse(
-            "<h2>templates/index.html not found</h2>",
-            status_code=500
-        )
-    return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={}
-    )
-
+def home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request, "categories": CATEGORIES})
 
 @app.get("/health")
-async def health():
-    return {
-        "status": "online",
-        "website": "BezawadaDeals",
-        "version": APP_VERSION
-    }
-
+def health():
+    return {"ok": True, "version": APP_VERSION}
 
 @app.get("/api/status")
-async def api_status():
-    return {
-        "success": True,
-        "version": APP_VERSION,
-        "categories": CATEGORIES,
-        "total_categories": len(CATEGORIES),
-        "total_wards": TOTAL_WARDS,
-        "price_statuses": ["Verified", "Estimated", "Expired"],
-        "price_sort": ["low_to_high", "high_to_low"]
-    }
-
-
-@app.get("/api/db-status")
-async def database_status():
+def api_status():
+    connected = False
     try:
-        with get_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute("""
-                    SELECT table_name
-                    FROM information_schema.tables
-                    WHERE table_schema='public'
-                    ORDER BY table_name
-                """)
-                tables = [r["table_name"] for r in cursor.fetchall()]
-        return {
-            "success": True,
-            "database": "connected",
-            "tables": tables
-        }
-    except Exception as error:
-        return {
-            "success": False,
-            "database": "connection failed",
-            "detail": str(error)
-        }
-
-
-@app.get("/api/check")
-async def check_files():
-    return {
-        "templates_folder": str(TEMPLATE_DIR),
-        "index_html_exists": (TEMPLATE_DIR / "index.html").is_file(),
-        "public_folder_exists": PUBLIC_DIR.is_dir()
-    }
-
-
-# ==========================================================
-# CATEGORIES AND WARDS
-# ==========================================================
+        with db() as conn:
+            conn.execute("SELECT 1")
+            connected = True
+    except Exception:
+        pass
+    return {"ok": True, "version": APP_VERSION, "database_connected": connected, "wards": TOTAL_WARDS, "categories": len(CATEGORIES)}
 
 @app.get("/api/categories")
-async def get_categories():
-    return {
-        "success": True,
-        "total_categories": len(CATEGORIES),
-        "categories": CATEGORIES
-    }
-
+def categories():
+    return {"categories": CATEGORIES}
 
 @app.get("/api/wards")
-async def get_wards():
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT id, ward_number, area_name, is_active
-                FROM wards
-                WHERE is_active=TRUE
-                ORDER BY ward_number
-            """)
-            rows = cursor.fetchall()
-    return {
-        "success": True,
-        "total_wards": len(rows),
-        "wards": rows
-    }
+def wards():
+    return {"wards": [{"ward_number": i, "ward_name": f"Ward {i}"} for i in range(1, TOTAL_WARDS+1)]}
 
-
-# ==========================================================
-# LOCALITY MANAGEMENT
-# ==========================================================
-
-class LocalityInput(BaseModel):
-    ward_number: int = Field(ge=1, le=86)
-    locality_name: str = Field(min_length=2, max_length=150)
-    locality_name_te: Optional[str] = None
-    is_verified: bool = False
-
-
-@app.post("/api/admin/localities")
-async def add_locality(
-    data: LocalityInput,
-    x_api_key: Optional[str] = Header(default=None)
-):
-    check_admin_key(x_api_key)
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT id FROM wards WHERE ward_number=%s AND is_active=TRUE",
-                (data.ward_number,)
-            )
-            ward = cursor.fetchone()
-            if not ward:
-                raise HTTPException(status_code=404, detail="Ward not found")
-
-            cursor.execute(
-                """
-                INSERT INTO localities(
-                    ward_id, locality_name, locality_name_te, is_verified
-                )
-                VALUES(%s,%s,%s,%s)
-                ON CONFLICT(ward_id, locality_name)
-                DO UPDATE SET
-                    locality_name_te=EXCLUDED.locality_name_te,
-                    is_verified=EXCLUDED.is_verified
-                RETURNING id, locality_name
-                """,
-                (
-                    ward["id"], data.locality_name.strip(),
-                    data.locality_name_te, data.is_verified
-                )
-            )
-            result = cursor.fetchone()
-        connection.commit()
-    return {"success": True, "locality": result}
-
-
-# ==========================================================
-# SHOP CREATION AND BULK IMPORT
-# ==========================================================
-
-class ShopInput(BaseModel):
-    shop_name: str = Field(min_length=2, max_length=180)
-    category: str
-    ward_number: int = Field(ge=1, le=86)
-    address: Optional[str] = None
-    phone: Optional[str] = None
-    owner_name: Optional[str] = None
-    locality_name: Optional[str] = None
-    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
-    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
-    image_url: Optional[str] = None
-
-
-def get_or_create_locality(cursor, ward_id, locality_name):
-    if not locality_name:
-        return None
-    name = locality_name.strip()
-    if len(name) < 2:
-        return None
-    cursor.execute(
-        """
-        INSERT INTO localities(ward_id, locality_name)
-        VALUES(%s,%s)
-        ON CONFLICT(ward_id, locality_name)
-        DO UPDATE SET locality_name=EXCLUDED.locality_name
-        RETURNING id
-        """,
-        (ward_id, name)
-    )
-    return cursor.fetchone()["id"]
-
-
-@app.post("/api/admin/shops")
-async def add_shop(
-    data: ShopInput,
-    x_api_key: Optional[str] = Header(default=None)
-):
-    check_admin_key(x_api_key)
-    category = canonical_category(data.category)
-
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT id FROM wards WHERE ward_number=%s AND is_active=TRUE",
-                (data.ward_number,)
-            )
-            ward = cursor.fetchone()
-            if not ward:
-                raise HTTPException(status_code=404, detail="Ward not found")
-
-            locality_id = get_or_create_locality(
-                cursor, ward["id"], data.locality_name
-            )
-            cursor.execute(
-                """
-                INSERT INTO shops(
-                    shop_name, category, ward_id, address, phone,
-                    owner_name, locality_id, latitude, longitude, image_url
-                )
-                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                RETURNING id, shop_name, category
-                """,
-                (
-                    data.shop_name.strip(), category, ward["id"],
-                    data.address, data.phone, data.owner_name, locality_id,
-                    data.latitude, data.longitude, data.image_url
-                )
-            )
-            shop = cursor.fetchone()
-        connection.commit()
-    return {"success": True, "shop": shop}
-
-
-class BulkShopRow(BaseModel):
-    shop_name: str = Field(min_length=2, max_length=180)
-    category: str
-    ward_number: int = Field(ge=1, le=86)
-    address: Optional[str] = None
-    phone: Optional[str] = None
-    owner_name: Optional[str] = None
-    locality_name: Optional[str] = None
-    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
-    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
-    image_url: Optional[str] = None
-
-
-class BulkShopImport(BaseModel):
-    shops: list[BulkShopRow] = Field(
-        min_length=1, max_length=MAX_IMPORT_SHOPS
-    )
-
-
-@app.post("/api/admin/import-shops")
-async def import_shops(
-    data: BulkShopImport,
-    x_api_key: Optional[str] = Header(default=None)
-):
-    check_admin_key(x_api_key)
-    inserted = 0
-    skipped = 0
-    seen = set()
-
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            for item in data.shops:
-                shop_name = item.shop_name.strip()
-                category = canonical_category(item.category)
-                key = (
-                    item.ward_number,
-                    shop_name.casefold(),
-                    category.casefold()
-                )
-                if key in seen:
-                    skipped += 1
-                    continue
-                seen.add(key)
-
-                cursor.execute(
-                    "SELECT id FROM wards WHERE ward_number=%s AND is_active=TRUE",
-                    (item.ward_number,)
-                )
-                ward = cursor.fetchone()
-                if not ward:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Ward {item.ward_number} not found"
-                    )
-
-                cursor.execute(
-                    """
-                    SELECT id FROM shops
-                    WHERE ward_id=%s
-                      AND LOWER(TRIM(shop_name))=LOWER(%s)
-                      AND LOWER(category)=LOWER(%s)
-                    LIMIT 1
-                    """,
-                    (ward["id"], shop_name, category)
-                )
-                if cursor.fetchone():
-                    skipped += 1
-                    continue
-
-                locality_id = get_or_create_locality(
-                    cursor, ward["id"], item.locality_name
-                )
-                cursor.execute(
-                    """
-                    INSERT INTO shops(
-                        shop_name, category, ward_id, address, phone,
-                        owner_name, locality_id, latitude, longitude,
-                        image_url, is_verified, data_connection_status
-                    )
-                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,FALSE,'not_connected')
-                    """,
-                    (
-                        shop_name, category, ward["id"], item.address,
-                        item.phone, item.owner_name, locality_id,
-                        item.latitude, item.longitude, item.image_url
-                    )
-                )
-                inserted += 1
-        connection.commit()
-
-    return {
-        "success": True,
-        "received": len(data.shops),
-        "inserted": inserted,
-        "skipped_duplicates": skipped
-    }
-
-
-# ==========================================================
-# SHOP OWNER TOKEN
-# ==========================================================
-
-@app.post("/api/admin/shops/{shop_id}/create-update-token")
-async def create_shop_update_token(
-    shop_id: int,
-    x_api_key: Optional[str] = Header(default=None)
-):
-    check_admin_key(x_api_key)
-    token = secrets.token_urlsafe(32)
-
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                UPDATE shops SET shop_update_token=%s
-                WHERE id=%s
-                RETURNING id, shop_name
-                """,
-                (token, shop_id)
-            )
-            shop = cursor.fetchone()
-            if not shop:
-                raise HTTPException(status_code=404, detail="Shop not found")
-        connection.commit()
-
-    return {
-        "success": True,
-        "shop": shop,
-        "shop_update_token": token,
-        "note": "Keep this token private."
-    }
-
-
-# ==========================================================
-# SHOP OWNER PRICE UPDATE
-# ==========================================================
-
-class PriceUpdate(BaseModel):
-    product_name: str = Field(min_length=1, max_length=150)
-    category: str
-    unit: str = Field(min_length=1, max_length=30)
-    price: float = Field(gt=0)
-    confirm_same_as_shop_price: bool
-
-
-@app.post("/api/shop/price-update")
-async def shop_owner_price_update(
-    data: PriceUpdate,
-    x_shop_token: Optional[str] = Header(default=None)
-):
-    if not x_shop_token:
-        raise HTTPException(status_code=401, detail="Missing X-Shop-Token")
-    if data.confirm_same_as_shop_price is not True:
-        raise HTTPException(
-            status_code=400, detail="Confirm current in-store price"
-        )
-
-    category = canonical_category(data.category)
-
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT id FROM shops WHERE shop_update_token=%s",
-                (x_shop_token,)
-            )
-            shop = cursor.fetchone()
-            if not shop:
-                raise HTTPException(status_code=401, detail="Invalid shop token")
-
-            cursor.execute(
-                """
-                SELECT id FROM products
-                WHERE LOWER(product_name)=LOWER(%s)
-                  AND LOWER(category)=LOWER(%s)
-                  AND LOWER(unit)=LOWER(%s)
-                LIMIT 1
-                """,
-                (
-                    data.product_name.strip(), category, data.unit.strip()
-                )
-            )
-            product = cursor.fetchone()
-
-            if product:
-                product_id = product["id"]
-            else:
-                cursor.execute(
-                    """
-                    INSERT INTO products(product_name, category, unit)
-                    VALUES(%s,%s,%s) RETURNING id
-                    """,
-                    (
-                        data.product_name.strip(), category, data.unit.strip()
-                    )
-                )
-                product_id = cursor.fetchone()["id"]
-
-            cursor.execute(
-                """
-                INSERT INTO prices(
-                    shop_id, product_id, price, price_type, source_name,
-                    source_type, is_live, in_store_confirmed,
-                    valid_until, updated_at
-                )
-                VALUES(
-                    %s,%s,%s,'shop_retail',
-                    'Shop owner confirmed','shop_owner_confirmed',
-                    FALSE,TRUE,NOW()+INTERVAL '24 hours',NOW()
-                )
-                RETURNING id, updated_at, valid_until
-                """,
-                (shop["id"], product_id, data.price)
-            )
-            result = cursor.fetchone()
-
-            cursor.execute(
-                """
-                UPDATE shops SET data_connection_status='owner_updated'
-                WHERE id=%s
-                """,
-                (shop["id"],)
-            )
-        connection.commit()
-
-    return {
-        "success": True,
-        "price": result,
-        "price_status": "Verified",
-        "verification_type": "Shop owner confirmed",
-        "message": "Confirmed in-store price saved for 24 hours"
-    }
-
-
-# ==========================================================
-# SHOP OWNER OFFER UPDATE
-# ==========================================================
-
-class OfferInput(BaseModel):
-    title: str = Field(min_length=2, max_length=180)
-    description: Optional[str] = None
-    discount_text: Optional[str] = None
-    valid_until: Optional[datetime] = None
-
-
-@app.post("/api/shop/offer-update")
-async def shop_owner_offer_update(
-    data: OfferInput,
-    x_shop_token: Optional[str] = Header(default=None)
-):
-    if not x_shop_token:
-        raise HTTPException(status_code=401, detail="Missing X-Shop-Token")
-
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT id FROM shops WHERE shop_update_token=%s",
-                (x_shop_token,)
-            )
-            shop = cursor.fetchone()
-            if not shop:
-                raise HTTPException(status_code=401, detail="Invalid shop token")
-
-            cursor.execute(
-                """
-                INSERT INTO offers(
-                    shop_id, title, description, discount_text, valid_until
-                )
-                VALUES(%s,%s,%s,%s,%s)
-                RETURNING id, title, valid_until
-                """,
-                (
-                    shop["id"], data.title, data.description,
-                    data.discount_text, data.valid_until
-                )
-            )
-            result = cursor.fetchone()
-        connection.commit()
-
-    return {"success": True, "offer": result}
-
-
-# ==========================================================
-# SHOPS BY WARD AND CATEGORY
-# ==========================================================
+@app.post("/api/shops")
+def create_shop(payload: dict):
+    name = str(payload.get("shop_name", "")).strip()
+    category = str(payload.get("category", "")).strip()
+    ward = payload.get("ward_number")
+    if not name or category not in CATEGORY_SET:
+        raise HTTPException(400, "Valid shop_name and category are required")
+    try: ward = int(ward)
+    except Exception: raise HTTPException(400, "ward_number must be 1-86")
+    if not 1 <= ward <= TOTAL_WARDS: raise HTTPException(400, "ward_number must be 1-86")
+    token = secrets.token_urlsafe(24)
+    with db() as conn:
+        w = conn.execute("SELECT id FROM wards WHERE ward_number=%s", (ward,)).fetchone()
+        row = conn.execute("""INSERT INTO shops(shop_name,category,ward_id,address,phone,owner_name,locality,image_url,shop_update_token)
+          VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id,shop_name,category,shop_update_token""",
+          (name, category, w["id"], payload.get("address"), payload.get("phone"), payload.get("owner_name"), payload.get("locality"), payload.get("image_url"), token)).fetchone()
+    return row
 
 @app.get("/api/shops")
-async def get_shops(
-    ward_number: int = Query(..., ge=1, le=86),
-    category: str = Query(...)
-):
-    category_value = (
-        "All" if category.strip().casefold() == "all"
-        else canonical_category(category)
-    )
-
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT
-                    s.id, s.shop_name, s.shop_name AS name, s.category,
-                    s.address, s.phone, s.is_verified,
-                    s.data_connection_status, s.latitude, s.longitude,
-                    s.image_url, w.ward_number, w.area_name,
-                    l.locality_name,
-                    latest.product_name, latest.unit, latest.price,
-                    latest.updated_at, latest.price_status
-                FROM shops s
-                JOIN wards w ON w.id=s.ward_id
-                LEFT JOIN localities l ON l.id=s.locality_id
-                LEFT JOIN LATERAL (
-                    SELECT
-                        p.product_name, p.unit, pr.price, pr.updated_at,
-                        CASE
-                            WHEN pr.valid_until IS NOT NULL
-                                 AND pr.valid_until<=NOW()
-                                THEN 'Expired'
-                            WHEN pr.in_store_confirmed=TRUE
-                                THEN 'Verified'
-                            ELSE 'Estimated'
-                        END AS price_status
-                    FROM prices pr
-                    JOIN products p ON p.id=pr.product_id
-                    WHERE pr.shop_id=s.id
-                    ORDER BY pr.updated_at DESC
-                    LIMIT 1
-                ) latest ON TRUE
-                WHERE w.ward_number=%s
-                  AND (%s='All' OR LOWER(s.category)=LOWER(%s))
-                ORDER BY s.shop_name
-                """,
-                (ward_number, category_value, category_value)
-            )
-            rows = cursor.fetchall()
-
-    return {
-        "success": True,
-        "ward_number": ward_number,
-        "category": category_value,
-        "total_shops": len(rows),
-        "shops": rows
-    }
-
-
-# ==========================================================
-# SHOP PRODUCTS
-# ==========================================================
+def list_shops(ward_number: int = Query(..., ge=1, le=86), category: str = "All"):
+    if category != "All" and category not in CATEGORY_SET: raise HTTPException(400, "Unknown category")
+    with db() as conn:
+        rows = conn.execute("""SELECT s.id,s.shop_name,s.category,s.address,s.phone,s.owner_name,s.locality,s.image_url,s.is_verified,w.ward_number,
+          (SELECT COUNT(*) FROM prices p WHERE p.shop_id=s.id AND p.is_live=TRUE) AS price_count
+          FROM shops s JOIN wards w ON w.id=s.ward_id
+          WHERE w.ward_number=%s AND (%s::text='All' OR s.category=%s::text)
+          ORDER BY s.shop_name""", (ward_number, category, category)).fetchall()
+    return {"shops": rows}
 
 @app.get("/api/shops/{shop_id}/products")
-async def get_shop_products(shop_id: int):
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT DISTINCT ON (p.id)
-                    p.id AS product_id, p.product_name, p.category, p.unit,
-                    pr.price, pr.source_name, pr.source_type,
-                    pr.updated_at, pr.valid_until,
-                    CASE
-                        WHEN pr.valid_until IS NOT NULL
-                             AND pr.valid_until<=NOW()
-                            THEN 'Expired'
-                        WHEN pr.in_store_confirmed=TRUE
-                            THEN 'Verified'
-                        ELSE 'Estimated'
-                    END AS price_status
-                FROM prices pr
-                JOIN products p ON p.id=pr.product_id
-                WHERE pr.shop_id=%s
-                ORDER BY p.id, pr.updated_at DESC
-                """,
-                (shop_id,)
-            )
-            rows = cursor.fetchall()
+def shop_products(shop_id: int):
+    with db() as conn:
+        rows = conn.execute("""SELECT p.product_name,p.category,p.unit,pr.price,pr.source_type,pr.updated_at,pr.valid_until,pr.in_store_confirmed
+          FROM prices pr JOIN products p ON p.id=pr.product_id WHERE pr.shop_id=%s AND pr.is_live=TRUE
+          ORDER BY pr.updated_at DESC""", (shop_id,)).fetchall()
+    for r in rows: r["status"] = status_for(r)
+    return {"products": rows}
 
-    return {
-        "success": True,
-        "shop_id": shop_id,
-        "total_products": len(rows),
-        "products": rows
-    }
-
-
-# ==========================================================
-# PRICE COMPARISON - CURRENT VERIFIED SHOP PRICES ONLY
-# ==========================================================
+@app.post("/api/shop/price-update")
+def shop_price_update(payload: dict, x_shop_token: Optional[str] = Header(None)):
+    if not x_shop_token: raise HTTPException(401, "X-Shop-Token header required")
+    name = str(payload.get("product_name", "")).strip()
+    category = str(payload.get("category", "")).strip()
+    unit = str(payload.get("unit", "piece")).strip() or "piece"
+    try: price = float(payload.get("price"))
+    except Exception: raise HTTPException(400, "Valid price required")
+    if price < 0 or not name or category not in CATEGORY_SET: raise HTTPException(400, "Valid product, category and non-negative price required")
+    if payload.get("confirm_same_as_shop_price") is not True:
+        raise HTTPException(400, "Owner must confirm that this is the current in-store price")
+    with db() as conn:
+        shop = conn.execute("SELECT id,category FROM shops WHERE shop_update_token=%s", (x_shop_token,)).fetchone()
+        if not shop: raise HTTPException(403, "Invalid shop token")
+        if shop["category"] != category: raise HTTPException(400, "Product category must match shop category")
+        product = conn.execute("SELECT id FROM products WHERE LOWER(product_name)=LOWER(%s) AND LOWER(category)=LOWER(%s) AND LOWER(unit)=LOWER(%s) ORDER BY id LIMIT 1", (name,category,unit)).fetchone()
+        if not product:
+            product = conn.execute("INSERT INTO products(product_name,category,unit) VALUES(%s,%s,%s) RETURNING id", (name,category,unit)).fetchone()
+        conn.execute("""INSERT INTO prices(shop_id,product_id,price,price_type,source_name,source_type,is_live,in_store_confirmed,valid_until,updated_at)
+          VALUES(%s,%s,%s,'retail','Shop owner','shop_owner_confirmed',TRUE,TRUE,NOW()+INTERVAL '24 hours',NOW())""", (shop["id"],product["id"],price))
+    return {"ok": True, "message": "Price update saved", "status": "Verified", "valid_for_hours": 24}
 
 @app.get("/api/price-comparison")
-async def price_comparison(
-    ward_number: int = Query(..., ge=1, le=86),
-    product_name: str = Query(..., min_length=1),
-    unit: Optional[str] = None
-):
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT
-                    s.id AS shop_id, s.shop_name, s.address, s.phone,
-                    s.latitude, s.longitude, w.ward_number,
-                    l.locality_name, p.product_name, p.unit,
-                    pr.price, pr.updated_at, pr.valid_until,
-                    'Verified' AS price_status,
-                    'Shop owner confirmed' AS verification_type
-                FROM prices pr
-                JOIN shops s ON s.id=pr.shop_id
-                JOIN wards w ON w.id=s.ward_id
-                LEFT JOIN localities l ON l.id=s.locality_id
-                JOIN products p ON p.id=pr.product_id
-                WHERE w.ward_number=%s
-                  AND LOWER(p.product_name)=LOWER(%s)
-                  AND (%s IS NULL OR LOWER(p.unit)=LOWER(%s))
-                  AND pr.in_store_confirmed=TRUE
-                  AND pr.valid_until>NOW()
-                ORDER BY pr.price ASC, pr.updated_at DESC
-                """,
-                (ward_number, product_name, unit, unit)
-            )
-            rows = cursor.fetchall()
-
-    return {
-        "success": True,
-        "ward_number": ward_number,
-        "product_name": product_name,
-        "sort": "low_to_high",
-        "total_prices": len(rows),
-        "prices": rows,
-        "message": (
-            "No current shop-confirmed prices available"
-            if not rows else None
-        )
-    }
-
-
-# ==========================================================
-# OFFERS
-# ==========================================================
-
-@app.get("/api/offers")
-async def get_offers(
-    ward_number: int = Query(..., ge=1, le=86)
-):
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT
-                    o.id, o.title, o.description, o.discount_text,
-                    o.valid_from, o.valid_until, s.id AS shop_id,
-                    s.shop_name, s.category, s.address, s.phone
-                FROM offers o
-                JOIN shops s ON s.id=o.shop_id
-                JOIN wards w ON w.id=s.ward_id
-                WHERE w.ward_number=%s
-                  AND o.is_active=TRUE
-                  AND o.valid_from<=NOW()
-                  AND (o.valid_until IS NULL OR o.valid_until>NOW())
-                ORDER BY o.updated_at DESC
-                """,
-                (ward_number,)
-            )
-            rows = cursor.fetchall()
-
-    return {
-        "success": True,
-        "total_offers": len(rows),
-        "offers": rows
-    }
-
-
-# ==========================================================
-# PRICE TRACKER - ALL 50 CATEGORIES
-# ==========================================================
-
-@app.get("/api/price-tracker")
-async def price_tracker(
-    ward_number: int = Query(..., ge=1, le=86),
-    category: str = Query(...),
-    product_name: Optional[str] = None,
-    sort: str = Query(default="low_to_high")
-):
-    category = canonical_category(category)
-
-    if sort not in ("low_to_high", "high_to_low"):
-        raise HTTPException(
-            status_code=400,
-            detail="sort must be low_to_high or high_to_low"
-        )
-
-    order_sql = "ASC" if sort == "low_to_high" else "DESC"
-
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                f"""
-                SELECT
-                    s.id AS shop_id, s.shop_name, s.address, s.phone,
-                    w.ward_number, p.product_name, p.category, p.unit,
-                    pr.price, pr.source_name, pr.source_type,
-                    pr.updated_at, pr.valid_until,
-                    CASE
-                        WHEN pr.valid_until IS NOT NULL
-                             AND pr.valid_until<=NOW()
-                            THEN 'Expired'
-                        WHEN pr.in_store_confirmed=TRUE
-                            THEN 'Verified'
-                        ELSE 'Estimated'
-                    END AS price_status
-                FROM prices pr
-                JOIN shops s ON s.id=pr.shop_id
-                JOIN wards w ON w.id=s.ward_id
-                JOIN products p ON p.id=pr.product_id
-                WHERE w.ward_number=%s
-                  AND LOWER(p.category)=LOWER(%s)
-                  AND (
-                    %s IS NULL
-                    OR LOWER(p.product_name)=LOWER(%s)
-                  )
-                ORDER BY pr.price {order_sql}, pr.updated_at DESC
-                """,
-                (ward_number, category, product_name, product_name)
-            )
-            rows = cursor.fetchall()
-
-    current_rows = [r for r in rows if r["price_status"] != "Expired"]
-
-    return {
-        "success": True,
-        "ward_number": ward_number,
-        "category": category,
-        "product_name": product_name,
-        "sort": sort,
-        "total_price_records": len(rows),
-        "current_price_records": len(current_rows),
-        "expired_records": len(rows) - len(current_rows),
-        "prices": rows,
-        "data_status": "Available" if current_rows else "Data Not Available",
-        "note": (
-            "Shop-owner-confirmed prices are not government official feeds."
-        )
-    }
-
-
-# ==========================================================
-# UNIFIED TRACKER - ALL CATEGORIES
-# ==========================================================
+def price_comparison(product: str = Query(..., min_length=1), unit: Optional[str] = None, ward_number: Optional[int] = Query(None, ge=1, le=86), sort: str = "low"):
+    order = "ASC" if sort.lower() != "high" else "DESC"
+    sql = f"""SELECT p.product_name,p.category,p.unit,pr.price,pr.source_type,pr.in_store_confirmed,pr.valid_until,pr.updated_at,
+      s.id shop_id,s.shop_name,s.address,s.phone,w.ward_number
+      FROM prices pr JOIN products p ON p.id=pr.product_id JOIN shops s ON s.id=pr.shop_id JOIN wards w ON w.id=s.ward_id
+      WHERE pr.is_live=TRUE AND LOWER(p.product_name)=LOWER(%s)
+      AND (%s::text IS NULL OR LOWER(p.unit)=LOWER(%s::text))
+      AND (%s::integer IS NULL OR w.ward_number=%s::integer)
+      ORDER BY pr.price {order},pr.updated_at DESC"""
+    with db() as conn:
+        rows = conn.execute(sql, (product,unit,unit,ward_number,ward_number)).fetchall()
+    for r in rows: r["status"] = status_for(r)
+    return {"product": product, "count": len(rows), "prices": rows}
 
 @app.get("/api/unified-price-tracker")
-async def unified_price_tracker(
-    category: str = Query(default="All"),
-    product_name: Optional[str] = None,
-    ward_number: Optional[int] = Query(default=None, ge=1, le=86),
-    sort: str = Query(default="low_to_high")
-):
-    """
-    Unified price list for all categories.
-    Only actual shop-confirmed prices are shown as Verified.
-    AGMARKNET is exposed separately as wholesale market data.
-    """
+def unified_tracker(category: str = "All", ward_number: Optional[int] = Query(None, ge=1, le=86), product: Optional[str] = None, sort: str = "low"):
+    if category != "All" and category not in CATEGORY_SET: raise HTTPException(400, "Unknown category")
+    order = "ASC" if sort.lower() != "high" else "DESC"
+    sql = f"""SELECT p.product_name,p.category,p.unit,pr.price,pr.source_type,pr.source_name,pr.in_store_confirmed,pr.valid_until,pr.updated_at,
+      s.id shop_id,s.shop_name,s.address,s.phone,s.locality,w.ward_number
+      FROM prices pr JOIN products p ON p.id=pr.product_id JOIN shops s ON s.id=pr.shop_id JOIN wards w ON w.id=s.ward_id
+      WHERE pr.is_live=TRUE AND (%s::text='All' OR LOWER(p.category)=LOWER(%s::text))
+      AND (%s::integer IS NULL OR w.ward_number=%s::integer)
+      AND (%s::text IS NULL OR LOWER(p.product_name)=LOWER(%s::text))
+      ORDER BY p.product_name,pr.price {order},pr.updated_at DESC LIMIT 1000"""
+    with db() as conn:
+        rows = conn.execute(sql,(category,category,ward_number,ward_number,product,product)).fetchall()
+    for r in rows: r["status"] = status_for(r)
+    return {"count":len(rows),"prices":rows,"categories":CATEGORIES}
 
-    if category.strip().casefold() == "all":
-        category_value = "All"
-    else:
-        category_value = canonical_category(category)
+@app.get("/api/price-tracker")
+def price_tracker(category: str = "All", product: Optional[str] = None, ward_number: Optional[int] = Query(None, ge=1, le=86)):
+    return unified_tracker(category, ward_number, product, "low")
 
-    if sort not in ("low_to_high", "high_to_low"):
-        raise HTTPException(
-            status_code=400,
-            detail="sort must be low_to_high or high_to_low"
-        )
-
-    order_sql = "ASC" if sort == "low_to_high" else "DESC"
-
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                f"""
-                SELECT
-                    s.id AS shop_id, s.shop_name, s.category AS shop_category,
-                    s.address, w.ward_number, p.product_name,
-                    p.category AS product_category, p.unit, pr.price,
-                    pr.price_type, pr.source_name, pr.source_type,
-                    pr.updated_at, pr.valid_until,
-                    CASE
-                        WHEN pr.valid_until IS NOT NULL
-                             AND pr.valid_until<=NOW()
-                            THEN 'Expired'
-                        WHEN pr.in_store_confirmed=TRUE
-                            THEN 'Verified'
-                        ELSE 'Estimated'
-                    END AS price_status
-                FROM prices pr
-                JOIN shops s ON s.id=pr.shop_id
-                JOIN wards w ON w.id=s.ward_id
-                JOIN products p ON p.id=pr.product_id
-                WHERE (%s='All' OR LOWER(p.category)=LOWER(%s))
-                  AND (%s IS NULL OR w.ward_number=%s)
-                  AND (
-                    %s IS NULL OR LOWER(p.product_name)=LOWER(%s)
-                  )
-                ORDER BY pr.price {order_sql}, pr.updated_at DESC
-                """,
-                (
-                    category_value, category_value,
-                    ward_number, ward_number,
-                    product_name, product_name
-                )
-            )
-            rows = cursor.fetchall()
-
-    active = [r for r in rows if r["price_status"] != "Expired"]
-    expired = [r for r in rows if r["price_status"] == "Expired"]
-
-    return {
-        "success": True,
-        "location": "Vijayawada",
-        "category": category_value,
-        "product_name": product_name,
-        "ward_number": ward_number,
-        "sort": sort,
-        "total_categories": len(CATEGORIES),
-        "total_records": len(rows),
-        "active_records": len(active),
-        "expired_records": len(expired),
-        "prices": rows,
-        "data_status": "Available" if active else "Data Not Available",
-        "price_statuses": ["Verified", "Estimated", "Expired"],
-        "note": (
-            "Verified means shop-owner-confirmed in-store price. "
-            "It does not mean government-certified."
-        )
-    }
-
-
-# ==========================================================
-# GOVERNMENT AGMARKNET PRICE FETCH
-# ==========================================================
-
-def fetch_government_market_prices(
-    commodity=None,
-    district="Krishna",
-    limit=100
-):
-    api_key = os.getenv("DATA_GOV_IN_API_KEY")
-
-    if not api_key:
-        return {
-            "success": False,
-            "source": AGMARKNET_SOURCE,
-            "source_type": "mandi_wholesale",
-            "error": "DATA_GOV_IN_API_KEY is not configured in Render Environment",
-            "api_key_configured": False,
-            "district": district,
-            "total_records": 0,
-            "prices": []
-        }
-
-    params = {
-        "api-key": api_key,
-        "format": "json",
-        "limit": str(limit),
-        "filters[state]": "Andhra Pradesh",
-        "filters[district]": district,
-        "sort[arrival_date]": "desc"
-    }
-
-    if commodity:
-        params["filters[commodity]"] = commodity.strip()
-
-    url = DATA_GOV_API_URL + "?" + urllib.parse.urlencode(params)
-    request = urllib.request.Request(
-        url,
-        headers={
-            "Accept": "application/json",
-            "User-Agent": "BezawadaDeals/9.0"
-        }
-    )
-
-    try:
-        with urllib.request.urlopen(request, timeout=25) as response:
-            raw = response.read().decode("utf-8")
-
-        payload = json.loads(raw)
-        if not isinstance(payload, dict):
-            raise ValueError("Invalid government API response")
-
-        records = payload.get("records", [])
-        if not isinstance(records, list):
-            records = []
-
-        prices = []
-
-        for item in records:
-            try:
-                modal = float(
-                    str(item.get("modal_price") or "0").replace(",", "")
-                )
-                minimum = float(
-                    str(item.get("min_price") or "0").replace(",", "")
-                )
-                maximum = float(
-                    str(item.get("max_price") or "0").replace(",", "")
-                )
-
-                if modal <= 0:
-                    continue
-
-                prices.append({
-                    "state": item.get("state"),
-                    "district": item.get("district"),
-                    "market": item.get("market"),
-                    "commodity": item.get("commodity"),
-                    "variety": item.get("variety"),
-                    "grade": item.get("grade"),
-                    "arrival_date": item.get("arrival_date"),
-                    "min_price": minimum,
-                    "max_price": maximum,
-                    "modal_price": modal,
-                    "unit": "quintal",
-                    "price_type": "Mandi wholesale",
-                    "price_status": "Verified",
-                    "source": AGMARKNET_SOURCE
-                })
-            except (TypeError, ValueError):
-                continue
-
-        return {
-            "success": True,
-            "source": AGMARKNET_SOURCE,
-            "source_type": "mandi_wholesale",
-            "district": district,
-            "api_key_configured": True,
-            "total_records": len(prices),
-            "prices": prices,
-            "checked_at": now_utc().isoformat(),
-            "important_note": (
-                "These are mandi wholesale prices per quintal, "
-                "not supermarket or retail shop prices."
-            )
-        }
-
-    except Exception as error:
-        return {
-            "success": False,
-            "source": AGMARKNET_SOURCE,
-            "source_type": "mandi_wholesale",
-            "district": district,
-            "api_key_configured": True,
-            "error": str(error),
-            "total_records": 0,
-            "prices": [],
-            "checked_at": now_utc().isoformat()
-        }
-
+@app.get("/api/offers")
+def offers(ward_number: Optional[int] = Query(None, ge=1, le=86)):
+    with db() as conn:
+        rows = conn.execute("""SELECT o.id,o.title,o.description,o.discount_text,o.valid_from,o.valid_until,s.shop_name,s.category,w.ward_number
+          FROM offers o JOIN shops s ON s.id=o.shop_id JOIN wards w ON w.id=s.ward_id
+          WHERE o.is_active=TRUE AND (o.valid_until IS NULL OR o.valid_until>=NOW())
+          AND (%s::integer IS NULL OR w.ward_number=%s::integer) ORDER BY o.updated_at DESC LIMIT 300""",(ward_number,ward_number)).fetchall()
+    return {"offers":rows}
 
 @app.get("/api/market-prices")
-async def government_market_prices(
-    district: str = Query(default="Krishna", min_length=2, max_length=80),
-    product_name: Optional[str] = Query(default=None, max_length=100),
-    limit: int = Query(default=100, ge=1, le=500)
-):
-    return fetch_government_market_prices(
-        commodity=product_name,
-        district=district,
-        limit=limit
-    )
-
-
-@app.get("/api/market-feed-status")
-async def market_feed_status():
-    return {
-        "success": True,
-        "provider": "data.gov.in",
-        "dataset": "AGMARKNET Daily Market Prices",
-        "api_key_configured": bool(os.getenv("DATA_GOV_IN_API_KEY")),
-        "data_type": "Daily mandi wholesale prices",
-        "district": "Krishna",
-        "ward_level_prices": False,
-        "retail_shop_prices": False,
-        "unit": "quintal",
-        "source": AGMARKNET_SOURCE,
-        "status": (
-            "Configured" if os.getenv("DATA_GOV_IN_API_KEY")
-            else "API key not configured"
-        )
-    }
-
-
-# ==========================================================
-# OFFICIAL FEED REGISTRY STATUS
-# ==========================================================
+def market_prices(district: str = "Krishna", limit: int = Query(100, ge=1, le=500)):
+    if not API_KEY:
+        return {"available":False,"source":"AGMARKNET via data.gov.in","message":"DATA_GOV_IN_API_KEY not configured","prices":[]}
+    params = urllib.parse.urlencode({"api-key":API_KEY,"format":"json","limit":limit,"filters[state]":"Andhra Pradesh","filters[district]":district})
+    url = f"https://api.data.gov.in/resource/{AGMARKNET_RESOURCE}?{params}"
+    try:
+        req=urllib.request.Request(url,headers={"User-Agent":"BezawadaDeals/1.0"})
+        with urllib.request.urlopen(req,timeout=18) as response: data=json.loads(response.read().decode("utf-8"))
+        out=[]
+        for r in data.get("records",[]):
+            out.append({"commodity":r.get("commodity"),"market":r.get("market"),"district":r.get("district"),"variety":r.get("variety"),"arrival_date":r.get("arrival_date"),"min_price":r.get("min_price"),"max_price":r.get("max_price"),"modal_price":r.get("modal_price"),"unit":"quintal","status":"Government wholesale","source":"AGMARKNET / data.gov.in"})
+        return {"available":True,"source":"AGMARKNET via data.gov.in","note":"Wholesale mandi prices per quintal; these are not shop retail prices.","prices":out}
+    except Exception as e:
+        return {"available":False,"source":"AGMARKNET via data.gov.in","message":f"Government feed unavailable: {type(e).__name__}","prices":[]}
 
 @app.get("/api/official-sources")
-async def official_sources():
-    """
-    Does not pretend every category has a live official price feed.
-    Feed status is unavailable until a real source is integrated.
-    """
-    return {
-        "success": True,
-        "location": "Vijayawada",
-        "categories": [
-            {
-                "category": category,
-                "official_retail_feed": "Data Not Available",
-                "estimated_price_generated": False
-            }
-            for category in CATEGORIES
-        ],
-        "available_official_feed": {
-            "name": AGMARKNET_SOURCE,
-            "type": "Mandi wholesale",
-            "endpoint": "/api/market-prices",
-            "not_retail_price": True
-        },
-        "note": (
-            "No supermarket or retailer price is invented. "
-            "A retailer's official feed must be connected before "
-            "its price can be shown as an official retail price."
-        )
-    }
+def official_sources():
+    return {"categories":[{"category":c,"official_retail_feed":"Data Not Available","retail_estimate_enabled":False,"retail_source":"Shop-owner confirmed updates only"} for c in CATEGORIES],"government_wholesale":{"source":"AGMARKNET / data.gov.in","category":"Agricultural commodities only","unit":"quintal","retail_equivalent":False}}
 
-
-# ==========================================================
-# WARD AND LOCALITY IMPORT
-# ==========================================================
-
-class WardImportItem(BaseModel):
-    ward_number: int = Field(ge=1, le=86)
-    area_name: str = Field(min_length=1, max_length=200)
-    localities: list[str] = Field(default_factory=list)
-
-
-class WardImportRequest(BaseModel):
-    wards: list[WardImportItem]
-
-
-def save_wards_data(data: WardImportRequest):
-    if len(data.wards) != 86:
-        raise HTTPException(
-            status_code=400,
-            detail="Ward data must contain exactly 86 wards"
-        )
-
-    numbers = [item.ward_number for item in data.wards]
-    if sorted(numbers) != list(range(1, 87)):
-        raise HTTPException(
-            status_code=400,
-            detail="Ward numbers must be 1 to 86 exactly once"
-        )
-
-    added = 0
-
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            for item in data.wards:
-                cursor.execute(
-                    """
-                    INSERT INTO wards(ward_number, area_name, is_active)
-                    VALUES(%s,%s,TRUE)
-                    ON CONFLICT(ward_number)
-                    DO UPDATE SET
-                        area_name=EXCLUDED.area_name,
-                        is_active=TRUE
-                    RETURNING id
-                    """,
-                    (item.ward_number, item.area_name.strip())
-                )
-                ward_id = cursor.fetchone()["id"]
-
-                for locality in item.localities:
-                    name = locality.strip()
-                    if len(name) < 2:
-                        continue
-
-                    cursor.execute(
-                        """
-                        INSERT INTO localities(
-                            ward_id, locality_name, is_verified
-                        )
-                        VALUES(%s,%s,FALSE)
-                        ON CONFLICT(ward_id, locality_name)
-                        DO NOTHING
-                        """,
-                        (ward_id, name)
-                    )
-                    if cursor.rowcount:
-                        added += 1
-        connection.commit()
-
-    return {
-        "success": True,
-        "wards_processed": 86,
-        "new_localities_added": added,
-        "verified": False
-    }
-
-
-@app.post("/api/admin/import-wards-json")
-async def import_wards_json(
-    data: WardImportRequest,
-    x_api_key: Optional[str] = Header(default=None)
-):
-    check_admin_key(x_api_key)
-    return save_wards_data(data)
-
-
-@app.post("/api/admin/import-wards")
-async def import_wards_file(
-    file: UploadFile = File(...),
-    x_api_key: Optional[str] = Header(default=None)
-):
-    check_admin_key(x_api_key)
-
-    if not file.filename or not file.filename.lower().endswith(".json"):
-        raise HTTPException(status_code=400, detail="Upload a JSON file")
-
-    try:
-        content = await file.read()
-        raw = json.loads(content.decode("utf-8-sig"))
-        data = WardImportRequest(**raw)
-        return save_wards_data(data)
-    except HTTPException:
-        raise
-    except Exception as error:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid ward JSON: {str(error)}"
-        )
-    finally:
-        await file.close()
-
-
-# ==========================================================
-# OWNER GUIDE
-# ==========================================================
+@app.get("/api/market-feed-status")
+def market_feed_status():
+    return {"source":"AGMARKNET / data.gov.in","api_key_configured":bool(API_KEY),"scope":"Agricultural mandi wholesale data; not retail prices"}
 
 @app.get("/api/owner-guide")
-async def owner_guide():
-    return {
-        "price_update_endpoint": "POST /api/shop/price-update",
-        "offer_endpoint": "POST /api/shop/offer-update",
-        "required_header": "X-Shop-Token",
-        "price_validity": "24 hours",
-        "price_status": "Verified - Shop owner confirmed",
-        "note": (
-            "Shop owners must confirm actual in-store prices. "
-            "This is not the same as a government official feed."
-        )
-    }
+def owner_guide():
+    return {"steps":["Admin creates a shop and securely shares its update token with the owner.","Owner submits POST /api/shop/price-update with X-Shop-Token.","Owner must confirm the submitted price matches the current in-store price.","Confirmed prices are labelled Verified for 24 hours, then Expired."],"never_publish_fake_prices":True}
