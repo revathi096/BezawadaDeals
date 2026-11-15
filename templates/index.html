@@ -5,167 +5,373 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BezawadaDeals - Vijayawada</title>
 <style>
-:root{--green:#087443;--light:#eaf7ef;--bg:#f5f8f6;--text:#202923;--muted:#68756d;--line:#e0e8e2}
-*{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
-.container{width:min(1200px,94%);margin:auto}
-header{background:white;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
-.header{min-height:64px;display:flex;justify-content:space-between;align-items:center}
-.logo{font-size:22px;font-weight:bold;color:var(--green)}
-.hero{background:linear-gradient(120deg,#075c39,#15965b);color:white;padding:38px 0}
-.hero h1{font-size:clamp(25px,5vw,38px);margin:0 0 8px}
-.section{padding:25px 0}
-.heading{margin-bottom:14px}
-.heading h2{margin:0 0 4px;font-size:22px}
-.heading p,.muted{color:var(--muted);font-size:13px}
-.panel,.shop-card,.offer-card,.price-card{background:white;border:1px solid var(--line);border-radius:13px;padding:15px}
-.filters{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.field label{display:block;font-size:13px;font-weight:bold;margin-bottom:6px}
-select,input{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;background:white;font:inherit;min-height:44px}
-button{font:inherit;cursor:pointer}
-.btn{padding:11px 17px;border-radius:8px;border:0;background:var(--green);color:white;font-weight:bold}
-.btn.alt{background:white;color:var(--green);border:1px solid var(--green)}
-.actions{display:flex;gap:9px;margin-top:13px;flex-wrap:wrap}
-.category-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:9px}
-.category-card{background:white;border:1px solid var(--line);border-radius:10px;padding:12px 5px;min-height:76px;color:var(--text)}
-.category-card.active{border:2px solid var(--green);background:var(--light);color:var(--green)}
-.category-card .emoji{display:block;font-size:23px}
-.category-card .name{font-size:11px;font-weight:bold}
-.shop-grid,.offer-grid,.price-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
-.shop-card{padding:0;overflow:hidden}
-.shop-body{padding:14px}
-.shop-card h3,.offer-card h3{margin:0 0 5px;font-size:17px}
-.tag{display:inline-block;background:var(--light);color:var(--green);border-radius:20px;padding:3px 8px;font-size:11px;margin:5px 0}
-.detail{font-size:13px;color:var(--muted);margin:6px 0;overflow-wrap:anywhere}
-.price{background:#f3f8f4;border-radius:8px;padding:9px;margin-top:9px}
-.card-actions{display:flex;gap:8px;margin-top:10px}
-.card-actions a{flex:1;text-align:center;padding:8px;border-radius:7px;text-decoration:none;font-size:12px;background:var(--light);color:var(--green)}
-.card-actions a.call{background:var(--green);color:white}
-.price-card{padding:13px}
-.price-card strong{font-size:19px;color:var(--green)}
-.row{display:flex;justify-content:space-between;gap:10px;align-items:center}
-.empty,.loading{background:white;border:1px solid var(--line);padding:22px;border-radius:12px;text-align:center;color:var(--muted);grid-column:1/-1}
-footer{background:#123c29;color:white;padding:24px 0;margin-top:30px}
-@media(max-width:850px){.category-grid{grid-template-columns:repeat(4,1fr)}.shop-grid,.offer-grid,.price-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:600px){.filters,.shop-grid,.offer-grid,.price-grid{grid-template-columns:1fr}.category-grid{grid-template-columns:repeat(3,1fr)}}
+:root {
+  --green:#087443;
+  --light:#eaf7ef;
+  --bg:#f5f8f6;
+  --text:#202923;
+  --muted:#68756d;
+  --line:#e0e8e2;
+}
+* { box-sizing:border-box; }
+body {
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.5;
+}
+.container { width:min(1200px,94%); margin:auto; }
+header {
+  background:white;
+  border-bottom:1px solid var(--line);
+  position:sticky;
+  top:0;
+  z-index:5;
+}
+.header {
+  min-height:64px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.logo { font-size:22px; font-weight:bold; color:var(--green); }
+.hero {
+  background:linear-gradient(120deg,#075c39,#15965b);
+  color:white;
+  padding:35px 0;
+}
+.hero h1 { font-size:clamp(25px,5vw,38px); margin:0 0 8px; }
+.section { padding:24px 0; }
+.heading { margin-bottom:14px; }
+.heading h2 { margin:0 0 4px; font-size:22px; }
+.heading p,.muted { color:var(--muted); font-size:13px; }
+.panel,.shop-card,.offer-card,.price-card,.tracker-card {
+  background:white;
+  border:1px solid var(--line);
+  border-radius:13px;
+  padding:15px;
+}
+.filters {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+.field label {
+  display:block;
+  font-size:13px;
+  font-weight:bold;
+  margin-bottom:6px;
+}
+select,input {
+  width:100%;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:white;
+  font:inherit;
+  min-height:44px;
+}
+button { font:inherit; cursor:pointer; }
+.btn {
+  padding:11px 17px;
+  border-radius:8px;
+  border:0;
+  background:var(--green);
+  color:white;
+  font-weight:bold;
+}
+.btn.alt {
+  background:white;
+  color:var(--green);
+  border:1px solid var(--green);
+}
+.actions { display:flex; gap:9px; margin-top:13px; flex-wrap:wrap; }
+.category-grid {
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:9px;
+}
+.category-card {
+  background:white;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:12px 5px;
+  min-height:76px;
+  color:var(--text);
+}
+.category-card.active {
+  border:2px solid var(--green);
+  background:var(--light);
+  color:var(--green);
+}
+.category-card .emoji { display:block; font-size:23px; }
+.category-card .name { font-size:11px; font-weight:bold; }
+.shop-grid,.offer-grid,.price-grid,.tracker-grid {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:13px;
+}
+.shop-card { padding:0; overflow:hidden; }
+.shop-body { padding:14px; }
+.shop-card h3,.offer-card h3 { margin:0 0 5px; font-size:17px; }
+.tag {
+  display:inline-block;
+  background:var(--light);
+  color:var(--green);
+  border-radius:20px;
+  padding:3px 8px;
+  font-size:11px;
+  margin:5px 0;
+}
+.detail {
+  font-size:13px;
+  color:var(--muted);
+  margin:6px 0;
+  overflow-wrap:anywhere;
+}
+.price {
+  background:#f3f8f4;
+  border-radius:8px;
+  padding:9px;
+  margin-top:9px;
+}
+.card-actions { display:flex; gap:8px; margin-top:10px; }
+.card-actions a {
+  flex:1;
+  text-align:center;
+  padding:8px;
+  border-radius:7px;
+  text-decoration:none;
+  font-size:12px;
+  background:var(--light);
+  color:var(--green);
+}
+.card-actions a.call { background:var(--green); color:white; }
+.price-card { padding:13px; }
+.price-card strong,.tracker-price {
+  font-size:21px;
+  color:var(--green);
+  font-weight:bold;
+}
+.row {
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+}
+.empty,.loading {
+  background:white;
+  border:1px solid var(--line);
+  padding:22px;
+  border-radius:12px;
+  text-align:center;
+  color:var(--muted);
+  grid-column:1/-1;
+}
+.tracker-top {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
+}
+.live-dot {
+  display:inline-block;
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:#15965b;
+  margin-right:5px;
+}
+.tracker-card { padding:14px; }
+.tracker-card h3 { margin:0 0 6px; font-size:16px; }
+.tracker-price { margin:8px 0; }
+.source-note {
+  font-size:12px;
+  color:var(--muted);
+  border-top:1px solid var(--line);
+  padding-top:8px;
+  margin-top:8px;
+}
+footer {
+  background:#123c29;
+  color:white;
+  padding:24px 0;
+  margin-top:30px;
+}
+@media(max-width:850px) {
+  .category-grid { grid-template-columns:repeat(4,1fr); }
+  .shop-grid,.offer-grid,.price-grid,.tracker-grid {
+    grid-template-columns:repeat(2,1fr);
+  }
+}
+@media(max-width:600px) {
+  .filters,.shop-grid,.offer-grid,.price-grid,.tracker-grid {
+    grid-template-columns:1fr;
+  }
+  .category-grid { grid-template-columns:repeat(3,1fr); }
+}
 </style>
 </head>
 <body>
 
 <header>
-<div class="container header">
-<div class="logo">🛍️ BezawadaDeals</div>
-<span class="muted">Vijayawada</span>
-</div>
+  <div class="container header">
+    <div class="logo">🛍️ BezawadaDeals</div>
+    <span class="muted">Vijayawada</span>
+  </div>
 </header>
 
 <section class="hero">
-<div class="container">
-<h1>మీ ప్రాంతంలోని షాపులు, ధరలు, ఆఫర్లు</h1>
-<p>Ward ఎంచుకుని Shops, Restaurants, Shopping Malls మరియు Local Offers చూడండి.</p>
-</div>
+  <div class="container">
+    <h1>మీ ప్రాంతంలోని షాపులు, ధరలు, ఆఫర్లు</h1>
+    <p>Ward ఎంచుకుని Shops, Restaurants, Shopping Malls మరియు Local Offers చూడండి.</p>
+  </div>
 </section>
 
 <main class="container">
 
 <section class="section">
-<div class="heading">
-<h2>Ward & Category ఎంచుకోండి</h2>
-<p>86 wards మరియు అన్ని categories.</p>
-</div>
-
-<div class="panel">
-<div class="filters">
-<div class="field">
-<label for="ward">Select Ward</label>
-<select id="ward"><option value="">Loading wards...</option></select>
-</div>
-<div class="field">
-<label for="category">Select Category</label>
-<select id="category"><option value="All">All Categories</option></select>
-</div>
-</div>
-<div class="actions">
-<button class="btn" id="show">Show Details</button>
-<button class="btn alt" id="reset">Reset</button>
-</div>
-</div>
+  <div class="heading">
+    <h2>Ward & Category ఎంచుకోండి</h2>
+    <p>86 wards మరియు అన్ని categories.</p>
+  </div>
+  <div class="panel">
+    <div class="filters">
+      <div class="field">
+        <label for="ward">Select Ward</label>
+        <select id="ward">
+          <option value="">Loading wards...</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="category">Select Category</label>
+        <select id="category">
+          <option value="All">All Categories</option>
+        </select>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="show">Show Details</button>
+      <button class="btn alt" id="reset">Reset</button>
+    </div>
+  </div>
 </section>
 
 <section class="section">
-<div class="heading">
-<h2>Shop by Category</h2>
-<p>Category మీద tap చేస్తే select అవుతుంది.</p>
-</div>
-<div class="category-grid" id="categories">
-<div class="loading">Loading categories...</div>
-</div>
+  <div class="heading">
+    <h2>Shop by Category</h2>
+    <p>Category మీద tap చేస్తే select అవుతుంది.</p>
+  </div>
+  <div class="category-grid" id="categories">
+    <div class="loading">Loading categories...</div>
+  </div>
 </section>
 
 <section class="section">
-<div class="heading">
-<h2 id="shopTitle">Local Shops</h2>
-<p>Shop details, contact number మరియు Google Maps.</p>
-</div>
-
-<div class="row" style="margin-bottom:12px">
-<span id="count" class="muted">Ward select చేయండి.</span>
-<select id="sort" style="max-width:180px">
-<option value="name">Shop Name</option>
-<option value="price">Lowest Price</option>
-</select>
-</div>
-
-<div class="shop-grid" id="shops">
-<div class="empty">Ward select చేయండి.</div>
-</div>
+  <div class="heading">
+    <h2 id="shopTitle">Local Shops</h2>
+    <p>Shop details, contact number మరియు Google Maps.</p>
+  </div>
+  <div class="row" style="margin-bottom:12px">
+    <span id="count" class="muted">Ward select చేయండి.</span>
+    <select id="sort" style="max-width:180px">
+      <option value="name">Shop Name</option>
+      <option value="price">Lowest Price</option>
+    </select>
+  </div>
+  <div class="shop-grid" id="shops">
+    <div class="empty">Ward select చేయండి.</div>
+  </div>
 </section>
 
 <section class="section">
-<div class="heading">
-<h2>Ward Offers & Discounts</h2>
-<p>Shop owners submit చేసిన active offers.</p>
-</div>
-<div class="offer-grid" id="offers">
-<div class="empty">Ward select చేసిన తర్వాత offers కనిపిస్తాయి.</div>
-</div>
+  <div class="heading">
+    <h2>Ward Offers & Discounts</h2>
+    <p>Databaseలో ఉన్న active offers.</p>
+  </div>
+  <div class="offer-grid" id="offers">
+    <div class="empty">Ward select చేసిన తర్వాత offers కనిపిస్తాయి.</div>
+  </div>
+</section>
+
+<!-- LIVE PRICE TRACKER -->
+<section class="section" id="liveTracker">
+  <div class="heading">
+    <h2>📊 Live Price Tracker</h2>
+    <p>ఎంచుకున్న Ward మరియు Categoryలో అందుబాటులో ఉన్న తాజా ధరలు.</p>
+  </div>
+
+  <div class="panel">
+    <div class="filters">
+      <div class="field">
+        <label for="trackerProduct">Product Name (Optional)</label>
+        <input id="trackerProduct" placeholder="ఉదా: Tomato, Rice, Milk">
+      </div>
+      <div class="field">
+        <label for="trackerUnit">Unit (Optional)</label>
+        <input id="trackerUnit" placeholder="kg / litre / packet">
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="trackerSearch">Check Prices</button>
+      <button class="btn alt" id="trackerRefresh">Refresh Now</button>
+    </div>
+  </div>
+
+  <div class="tracker-top" style="margin-top:14px">
+    <span id="trackerStatus" class="muted">Ward మరియు Category select చేయండి.</span>
+    <span class="muted"><span class="live-dot"></span>Auto check every 5 minutes</span>
+  </div>
+
+  <div class="tracker-grid" id="trackerResults">
+    <div class="empty">
+      ధరలు చూడటానికి Ward మరియు ఒక Category select చేయండి.
+    </div>
+  </div>
+
+  <p class="muted" style="margin-top:10px">
+    గమనిక: Tracker ప్రతి 5 నిమిషాలకు databaseను మళ్లీ చెక్ చేస్తుంది.
+    Databaseలో ఉన్న ధృవీకరించిన ధరలనే చూపిస్తుంది. కొత్త షాపు ధరలు
+    ఆటోమేటిక్‌గా రావాలంటే సంబంధిత అధికారిక data feed అవసరం.
+  </p>
 </section>
 
 <section class="section">
-<div class="heading">
-<h2>Price Comparison</h2>
-<p>Shop owner confirm చేసిన తాజా in-store prices మాత్రమే.</p>
-</div>
-
-<div class="panel">
-<div class="filters">
-<div class="field">
-<label for="product">Product Name</label>
-<input id="product" placeholder="ఉదా: Tomato, Rice, Milk">
-</div>
-<div class="field">
-<label for="unit">Unit (optional)</label>
-<input id="unit" placeholder="kg / litre / packet">
-</div>
-</div>
-<div class="actions">
-<button class="btn" id="compare">Compare Prices</button>
-</div>
-</div>
-
-<div class="price-grid" id="priceResults" style="margin-top:12px">
-<div class="empty">Ward మరియు product name ఇవ్వండి.</div>
-</div>
+  <div class="heading">
+    <h2>Price Comparison</h2>
+    <p>Databaseలో ఉన్న తాజా ధృవీకరించిన in-store prices.</p>
+  </div>
+  <div class="panel">
+    <div class="filters">
+      <div class="field">
+        <label for="product">Product Name</label>
+        <input id="product" placeholder="ఉదా: Tomato, Rice, Milk">
+      </div>
+      <div class="field">
+        <label for="unit">Unit (optional)</label>
+        <input id="unit" placeholder="kg / litre / packet">
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="compare">Compare Prices</button>
+    </div>
+  </div>
+  <div class="price-grid" id="priceResults" style="margin-top:12px">
+    <div class="empty">Ward మరియు product name ఇవ్వండి.</div>
+  </div>
 </section>
 
 </main>
 
 <footer>
-<div class="container">
-<h2>BezawadaDeals</h2>
-<p>Vijayawada Local Shopping Marketplace</p>
-<small>Prices are shown only after shop-owner confirmation. Final billing price should be checked at the shop.</small>
-</div>
+  <div class="container">
+    <h2>BezawadaDeals</h2>
+    <p>Vijayawada Local Shopping Marketplace</p>
+    <small>ధరల తాజాదనం మరియు షాపు వద్ద ఉన్న అసలు ధరను కొనుగోలు ముందు నిర్ధారించుకోండి.</small>
+  </div>
 </footer>
 
 <script>
@@ -174,373 +380,467 @@ footer{background:#123c29;color:white;padding:24px 0;margin-top:30px}
 const $ = id => document.getElementById(id);
 
 const icons = {
-"Vegetables":"🥦","Fruits":"🍎","Groceries":"🛒",
-"Rice & Pulses":"🌾","Dairy & Bakery":"🥛",
-"Meat & Seafood":"🐟","Supermarkets":"🏬",
-"Wholesale Stores":"📦","Shopping Malls":"🏢",
-"Department Stores":"🛍️","Restaurants":"🍽️",
-"Fast Food":"🍔","Cafes & Tea":"☕",
-"Juice & Ice Cream":"🍦","Sweets & Bakeries":"🍰",
-"Electronics":"📱","Mobile Stores":"📲",
-"Computers":"💻","Home Appliances":"🔌",
-"Fashion & Clothing":"👕","Footwear":"👟",
-"Bags":"👜","Jewellery":"💍","Accessories":"⌚",
-"Cosmetics":"💄","Medical Stores":"💊",
-"Hospitals & Clinics":"🏥","Optical Stores":"👓",
-"Petrol Bunks":"⛽","Auto Sales & Repair":"🚗",
-"Hardware":"🔧","Electrical Stores":"💡",
-"Furniture":"🪑","Home & Kitchen":"🏠",
-"Books & Stationery":"📚","Toys & Baby Products":"🧸",
-"Sports & Fitness":"⚽","Flowers":"💐","Gifts":"🎁",
-"Salons & Beauty":"💇","Laundry":"🧺",
-"Photo & Printing":"📷","Banks & ATMs":"🏦",
-"Internet & Mobile Services":"🌐",
-"Repairs & Services":"🛠️",
-"Education & Coaching":"🎓",
-"Travel & Transport":"🚌",
-"Local Services":"🧰","Pet Shops":"🐶",
-"Other Shops":"🏪"
+  "Vegetables":"🥦","Fruits":"🍎","Groceries":"🛒",
+  "Rice & Pulses":"🌾","Dairy & Bakery":"🥛",
+  "Meat & Seafood":"🐟","Supermarkets":"🏬",
+  "Wholesale Stores":"📦","Shopping Malls":"🏢",
+  "Department Stores":"🛍️","Restaurants":"🍽️",
+  "Fast Food":"🍔","Cafes & Tea":"☕",
+  "Juice & Ice Cream":"🍦","Sweets & Bakeries":"🍰",
+  "Electronics":"📱","Mobile Stores":"📲",
+  "Computers":"💻","Home Appliances":"🔌",
+  "Fashion & Clothing":"👕","Footwear":"👟",
+  "Bags":"👜","Jewellery":"💍","Accessories":"⌚",
+  "Cosmetics":"💄","Medical Stores":"💊",
+  "Hospitals & Clinics":"🏥","Optical Stores":"👓",
+  "Petrol Bunks":"⛽","Auto Sales & Repair":"🚗",
+  "Hardware":"🔧","Electrical Stores":"💡",
+  "Furniture":"🪑","Home & Kitchen":"🏠",
+  "Books & Stationery":"📚","Toys & Baby Products":"🧸",
+  "Sports & Fitness":"⚽","Flowers":"💐","Gifts":"🎁",
+  "Salons & Beauty":"💇","Laundry":"🧺",
+  "Photo & Printing":"📷","Banks & ATMs":"🏦",
+  "Internet & Mobile Services":"🌐",
+  "Repairs & Services":"🛠️",
+  "Education & Coaching":"🎓",
+  "Travel & Transport":"🚌",
+  "Local Services":"🧰","Pet Shops":"🐶",
+  "Other Shops":"🏪"
 };
 
 let ward = "";
 let category = "All";
 let shopRows = [];
+let trackerTimer = null;
+let lastTrackerQuery = "";
 
 function esc(value) {
-    return String(value ?? "").replace(/[&<>"']/g, char => ({
-        "&":"&amp;",
-        "<":"&lt;",
-        ">":"&gt;",
-        '"':"&quot;",
-        "'":"&#39;"
-    }[char]));
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#39;"
+  }[char]));
 }
 
 async function getData(url) {
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error("Request failed: " + response.status);
-    }
-    return response.json();
+  const response = await fetch(url, {cache:"no-store"});
+  if (!response.ok) {
+    throw new Error("Request failed: " + response.status);
+  }
+  return response.json();
+}
+
+function formatDate(value) {
+  if (!value) return "సమయం అందుబాటులో లేదు";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "సమయం అందుబాటులో లేదు";
+  return date.toLocaleString("en-IN", {
+    dateStyle:"medium",
+    timeStyle:"short"
+  });
 }
 
 function setCategory(value) {
-    category = value;
-    $("category").value = value;
+  category = value;
+  $("category").value = value;
 
-    document.querySelectorAll(".category-card").forEach(button => {
-        button.classList.toggle(
-            "active",
-            button.dataset.category === value
-        );
-    });
+  document.querySelectorAll(".category-card").forEach(button => {
+    button.classList.toggle(
+      "active",
+      button.dataset.category === value
+    );
+  });
 
-    if (ward) {
-        loadShops();
-    }
+  if (ward) {
+    loadShops();
+    loadTracker();
+  }
 }
 
 async function initialize() {
-    try {
-        const [wardData, categoryData] = await Promise.all([
-            getData("/api/wards"),
-            getData("/api/categories")
-        ]);
+  try {
+    const [wardData, categoryData] = await Promise.all([
+      getData("/api/wards"),
+      getData("/api/categories")
+    ]);
 
-        $("ward").innerHTML = '<option value="">Select Ward</option>';
+    $("ward").innerHTML = '<option value="">Select Ward</option>';
 
-        (wardData.wards || []).forEach(item => {
-            const option = document.createElement("option");
-            option.value = item.ward_number;
-            option.textContent =
-                `Ward ${item.ward_number} - ${item.area_name}`;
-            $("ward").appendChild(option);
-        });
+    (wardData.wards || []).forEach(item => {
+      const option = document.createElement("option");
+      option.value = item.ward_number;
+      option.textContent =
+        `Ward ${item.ward_number} - ${item.area_name}`;
+      $("ward").appendChild(option);
+    });
 
-        $("category").innerHTML =
-            '<option value="All">All Categories</option>';
+    $("category").innerHTML =
+      '<option value="All">All Categories</option>';
 
-        $("categories").innerHTML = "";
+    $("categories").innerHTML = "";
 
-        (categoryData.categories || []).forEach(item => {
-            const option = document.createElement("option");
-            option.value = item;
-            option.textContent = item;
-            $("category").appendChild(option);
+    (categoryData.categories || []).forEach(item => {
+      const option = document.createElement("option");
+      option.value = item;
+      option.textContent = item;
+      $("category").appendChild(option);
 
-            const button = document.createElement("button");
-            button.type = "button";
-            button.className = "category-card";
-            button.dataset.category = item;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "category-card";
+      button.dataset.category = item;
 
-            const emoji = document.createElement("span");
-            emoji.className = "emoji";
-            emoji.textContent = icons[item] || "🏪";
+      const emoji = document.createElement("span");
+      emoji.className = "emoji";
+      emoji.textContent = icons[item] || "🏪";
 
-            const name = document.createElement("span");
-            name.className = "name";
-            name.textContent = item;
+      const name = document.createElement("span");
+      name.className = "name";
+      name.textContent = item;
 
-            button.appendChild(emoji);
-            button.appendChild(name);
-            button.addEventListener("click", () => setCategory(item));
+      button.appendChild(emoji);
+      button.appendChild(name);
+      button.addEventListener("click", () => setCategory(item));
+      $("categories").appendChild(button);
+    });
 
-            $("categories").appendChild(button);
-        });
+    setCategory("All");
 
-        setCategory("All");
-
-    } catch (error) {
-        $("shops").innerHTML =
-            `<div class="empty">Data load కాలేదు: ${esc(error.message)}</div>`;
-    }
+  } catch (error) {
+    $("shops").innerHTML =
+      `<div class="empty">Data load కాలేదు: ${esc(error.message)}</div>`;
+  }
 }
 
 async function loadShops() {
-    ward = $("ward").value;
+  ward = $("ward").value;
 
-    if (!ward) {
-        $("shops").innerHTML =
-            '<div class="empty">ముందుగా Ward select చేయండి.</div>';
-        $("offers").innerHTML =
-            '<div class="empty">Ward select చేయండి.</div>';
-        return;
-    }
-
+  if (!ward) {
     $("shops").innerHTML =
-        '<div class="loading">Loading shops...</div>';
+      '<div class="empty">ముందుగా Ward select చేయండి.</div>';
+    $("offers").innerHTML =
+      '<div class="empty">Ward select చేయండి.</div>';
+    return;
+  }
 
-    try {
-        const data = await getData(
-            `/api/shops?ward_number=${encodeURIComponent(ward)}&category=${encodeURIComponent(category)}`
-        );
+  $("shops").innerHTML =
+    '<div class="loading">Loading shops...</div>';
 
-        shopRows = data.shops || [];
-        renderShops();
-        loadOffers();
+  try {
+    const data = await getData(
+      `/api/shops?ward_number=${encodeURIComponent(ward)}&category=${encodeURIComponent(category)}`
+    );
 
-    } catch (error) {
-        $("shops").innerHTML =
-            `<div class="empty">Error: ${esc(error.message)}</div>`;
-    }
+    shopRows = data.shops || [];
+    renderShops();
+    loadOffers();
+
+  } catch (error) {
+    $("shops").innerHTML =
+      `<div class="empty">Error: ${esc(error.message)}</div>`;
+  }
 }
 
 function renderShops() {
-    let rows = [...shopRows];
+  let rows = [...shopRows];
 
-    if ($("sort").value === "price") {
-        rows.sort((a, b) => {
-            if (a.price == null) return 1;
-            if (b.price == null) return -1;
-            return Number(a.price) - Number(b.price);
-        });
-    } else {
-        rows.sort((a, b) =>
-            (a.shop_name || "").localeCompare(b.shop_name || "")
-        );
-    }
+  if ($("sort").value === "price") {
+    rows.sort((a,b) => {
+      if (a.price == null) return 1;
+      if (b.price == null) return -1;
+      return Number(a.price) - Number(b.price);
+    });
+  } else {
+    rows.sort((a,b) =>
+      (a.shop_name || "").localeCompare(b.shop_name || "")
+    );
+  }
 
-    $("count").textContent =
-        `${rows.length} shops found in Ward ${ward}`;
+  $("count").textContent =
+    `${rows.length} shops found in Ward ${ward}`;
 
-    $("shopTitle").textContent =
-        `Ward ${ward} - ${category}`;
+  $("shopTitle").textContent =
+    `Ward ${ward} - ${category}`;
 
-    if (!rows.length) {
-        $("shops").innerHTML =
-            '<div class="empty">ఈ Ward మరియు Categoryలో shop records ఇంకా databaseలో లేవు. Shop details add చేసిన తర్వాత ఇక్కడ కనిపిస్తాయి.</div>';
-        return;
-    }
+  if (!rows.length) {
+    $("shops").innerHTML =
+      '<div class="empty">ఈ Ward మరియు Categoryలో shop records ఇంకా databaseలో లేవు.</div>';
+    return;
+  }
 
-    $("shops").innerHTML = rows.map(shop => {
-        const address = [
-            shop.address,
-            shop.locality_name,
-            shop.area_name,
-            `Ward ${shop.ward_number}`
-        ].filter(Boolean).join(", ");
+  $("shops").innerHTML = rows.map(shop => {
+    const address = [
+      shop.address,
+      shop.locality_name,
+      shop.area_name,
+      `Ward ${shop.ward_number}`
+    ].filter(Boolean).join(", ");
 
-        const mapUrl =
-            shop.latitude != null && shop.longitude != null
-            ? `https://www.google.com/maps/search/?api=1&query=${shop.latitude},${shop.longitude}`
-            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((shop.shop_name || "") + " " + address + " Vijayawada")}`;
+    const mapUrl =
+      shop.latitude != null && shop.longitude != null
+      ? `https://www.google.com/maps/search/?api=1&query=${shop.latitude},${shop.longitude}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((shop.shop_name || "") + " " + address + " Vijayawada")}`;
 
-        const priceHtml = shop.price != null
-            ? `<div class="price">
-                Confirmed in-store price:
-                <b>₹${esc(shop.price)}</b>
-                ${esc(shop.product_name || "")}
-                <div class="muted">
-                    Updated: ${esc(new Date(shop.updated_at).toLocaleString())}
-                </div>
-               </div>`
-            : '<div class="price muted">Confirmed price not available</div>';
+    const priceHtml = shop.price != null
+      ? `<div class="price">
+          Confirmed in-store price:
+          <b>₹${esc(shop.price)}</b>
+          ${esc(shop.product_name || "")}
+          <div class="muted">Updated: ${esc(formatDate(shop.updated_at))}</div>
+        </div>`
+      : '<div class="price muted">Confirmed price not available</div>';
 
-        return `
-        <article class="shop-card">
-            ${shop.image_url
-                ? `<img src="${esc(shop.image_url)}" alt=""
-                    style="width:100%;height:150px;object-fit:cover">`
-                : ""}
-            <div class="shop-body">
-                <h3>${esc(shop.shop_name)}</h3>
-                <span class="tag">${esc(shop.category)}</span>
-                <p class="detail">📍 ${esc(address || "Address not available")}</p>
-                ${shop.phone
-                    ? `<p class="detail">☎ ${esc(shop.phone)}</p>`
-                    : ""}
-                ${priceHtml}
-                <div class="card-actions">
-                    <a target="_blank" rel="noopener"
-                       href="${esc(mapUrl)}">Google Maps</a>
-                    ${shop.phone
-                        ? `<a class="call" href="tel:${esc(shop.phone)}">Call</a>`
-                        : ""}
-                </div>
-            </div>
-        </article>`;
-    }).join("");
+    return `
+      <article class="shop-card">
+        ${shop.image_url
+          ? `<img src="${esc(shop.image_url)}" alt=""
+              style="width:100%;height:150px;object-fit:cover">`
+          : ""}
+        <div class="shop-body">
+          <h3>${esc(shop.shop_name)}</h3>
+          <span class="tag">${esc(shop.category)}</span>
+          <p class="detail">📍 ${esc(address || "Address not available")}</p>
+          ${shop.phone ? `<p class="detail">☎ ${esc(shop.phone)}</p>` : ""}
+          ${priceHtml}
+          <div class="card-actions">
+            <a target="_blank" rel="noopener" href="${esc(mapUrl)}">Google Maps</a>
+            ${shop.phone ? `<a class="call" href="tel:${esc(shop.phone)}">Call</a>` : ""}
+          </div>
+        </div>
+      </article>`;
+  }).join("");
 }
 
 async function loadOffers() {
-    if (!ward) return;
+  if (!ward) return;
 
-    try {
-        const data = await getData(
-            `/api/offers?ward_number=${encodeURIComponent(ward)}`
-        );
+  try {
+    const data = await getData(
+      `/api/offers?ward_number=${encodeURIComponent(ward)}`
+    );
 
-        const offers = data.offers || [];
+    const offers = data.offers || [];
 
-        if (!offers.length) {
-            $("offers").innerHTML =
-                '<div class="empty">ఈ Wardలో active offers లేవు.</div>';
-            return;
-        }
-
-        $("offers").innerHTML = offers.map(offer => `
-            <article class="offer-card">
-                <h3>${esc(offer.title)}</h3>
-                <span class="tag">
-                    ${esc(offer.discount_text || "Offer")}
-                </span>
-                <p class="detail">
-                    ${esc(offer.shop_name)} · ${esc(offer.category)}
-                </p>
-                <p>${esc(offer.description || "")}</p>
-                <p class="muted">${esc(offer.address || "")}</p>
-                ${offer.phone
-                    ? `<a href="tel:${esc(offer.phone)}">Call Shop</a>`
-                    : ""}
-            </article>
-        `).join("");
-
-    } catch (error) {
-        $("offers").innerHTML =
-            '<div class="empty">Offers load కాలేదు.</div>';
+    if (!offers.length) {
+      $("offers").innerHTML =
+        '<div class="empty">ఈ Wardలో active offers లేవు.</div>';
+      return;
     }
+
+    $("offers").innerHTML = offers.map(offer => `
+      <article class="offer-card">
+        <h3>${esc(offer.title)}</h3>
+        <span class="tag">${esc(offer.discount_text || "Offer")}</span>
+        <p class="detail">${esc(offer.shop_name)} · ${esc(offer.category)}</p>
+        <p>${esc(offer.description || "")}</p>
+        <p class="muted">${esc(offer.address || "")}</p>
+        ${offer.phone ? `<a href="tel:${esc(offer.phone)}">Call Shop</a>` : ""}
+      </article>
+    `).join("");
+
+  } catch (error) {
+    $("offers").innerHTML =
+      '<div class="empty">Offers load కాలేదు.</div>';
+  }
+}
+
+/* LIVE PRICE TRACKER */
+
+function trackerMessage(message) {
+  $("trackerResults").innerHTML =
+    `<div class="empty">${esc(message)}</div>`;
+}
+
+async function loadTracker() {
+  ward = $("ward").value;
+  category = $("category").value || "All";
+
+  if (!ward) {
+    $("trackerStatus").textContent = "Ward select చేయండి.";
+    trackerMessage("ధరలు చూడటానికి ముందుగా Ward select చేయండి.");
+    return;
+  }
+
+  if (category === "All") {
+    $("trackerStatus").textContent = "ఒక Category select చేయండి.";
+    trackerMessage("Live Price Tracker కోసం Vegetables, Fruits, Groceries వంటి ఒక Category select చేయండి.");
+    return;
+  }
+
+  const product = $("trackerProduct").value.trim();
+  const unit = $("trackerUnit").value.trim();
+
+  let url =
+    `/api/price-tracker?ward_number=${encodeURIComponent(ward)}&category=${encodeURIComponent(category)}`;
+
+  if (product) {
+    url += `&product_name=${encodeURIComponent(product)}`;
+  }
+
+  lastTrackerQuery = url;
+  $("trackerStatus").textContent = "ధరలను చెక్ చేస్తోంది...";
+
+  try {
+    const data = await getData(url);
+    const prices = data.prices || [];
+
+    $("trackerStatus").textContent =
+      `Ward ${ward} · ${category} · Last checked: ${formatDate(new Date())}`;
+
+    const filtered = unit
+      ? prices.filter(item =>
+          String(item.unit || "").toLowerCase() === unit.toLowerCase()
+        )
+      : prices;
+
+    if (!filtered.length) {
+      trackerMessage(
+        "ఈ Ward మరియు Categoryలో ప్రస్తుతం చూపించగల ధృవీకరించిన ధరలు లేవు. కొత్త ధరల Feed అందుబాటులో లేదు."
+      );
+      return;
+    }
+
+    $("trackerResults").innerHTML = filtered.map((item,index) => `
+      <article class="tracker-card">
+        <div class="row">
+          <span class="tag">Price ${index + 1}</span>
+          <span class="muted">Ward ${esc(item.ward_number)}</span>
+        </div>
+        <h3>${esc(item.product_name)}</h3>
+        <div class="tracker-price">₹${esc(item.price)} <small> / ${esc(item.unit)}</small></div>
+        <p class="detail"><b>Shop:</b> ${esc(item.shop_name)}</p>
+        <p class="detail">📍 ${esc(item.address || "Address not available")}</p>
+        <p class="detail">Updated: ${esc(formatDate(item.updated_at))}</p>
+        <div class="source-note">
+          Source: Existing shop-confirmed database record.
+          <br>
+          Valid until: ${esc(formatDate(item.valid_until))}
+        </div>
+        ${item.phone ? `<div class="card-actions"><a class="call" href="tel:${esc(item.phone)}">Call Shop</a></div>` : ""}
+      </article>
+    `).join("");
+
+  } catch (error) {
+    $("trackerStatus").textContent = "Tracker data load కాలేదు.";
+    trackerMessage("Tracker error: " + error.message);
+  }
+}
+
+function startTrackerAutoRefresh() {
+  if (trackerTimer) {
+    clearInterval(trackerTimer);
+  }
+
+  trackerTimer = setInterval(() => {
+    if ($("ward").value && $("category").value !== "All") {
+      loadTracker();
+    }
+  }, 5 * 60 * 1000);
 }
 
 async function comparePrices() {
-    ward = $("ward").value;
+  ward = $("ward").value;
 
-    if (!ward) {
-        alert("ముందుగా Ward select చేయండి.");
-        return;
+  if (!ward) {
+    alert("ముందుగా Ward select చేయండి.");
+    return;
+  }
+
+  const product = $("product").value.trim();
+  const unit = $("unit").value.trim();
+
+  if (!product) {
+    alert("Product name ఇవ్వండి.");
+    return;
+  }
+
+  $("priceResults").innerHTML =
+    '<div class="loading">Comparing prices...</div>';
+
+  try {
+    let url =
+      `/api/price-comparison?ward_number=${encodeURIComponent(ward)}&product_name=${encodeURIComponent(product)}`;
+
+    if (unit) {
+      url += `&unit=${encodeURIComponent(unit)}`;
     }
 
-    const product = $("product").value.trim();
-    const unit = $("unit").value.trim();
+    const data = await getData(url);
+    const prices = data.prices || [];
 
-    if (!product) {
-        alert("Product name ఇవ్వండి.");
-        return;
+    if (!prices.length) {
+      $("priceResults").innerHTML =
+        '<div class="empty">ఈ productకు ఈ Wardలో తాజా ధృవీకరించిన ధరలు లేవు.</div>';
+      return;
     }
 
+    $("priceResults").innerHTML = prices.map((item,index) => `
+      <article class="price-card">
+        <div class="row">
+          <b>${index + 1}. ${esc(item.shop_name)}</b>
+          <strong>₹${esc(item.price)}</strong>
+        </div>
+        <p class="detail">${esc(item.product_name)} / ${esc(item.unit)}</p>
+        <p class="detail">${esc(item.address || "")}</p>
+        <p class="muted">Updated: ${esc(formatDate(item.updated_at))}</p>
+        ${item.phone ? `<a href="tel:${esc(item.phone)}">Call Shop</a>` : ""}
+      </article>
+    `).join("");
+
+  } catch (error) {
     $("priceResults").innerHTML =
-        '<div class="loading">Comparing prices...</div>';
-
-    try {
-        let url =
-            `/api/price-comparison?ward_number=${encodeURIComponent(ward)}&product_name=${encodeURIComponent(product)}`;
-
-        if (unit) {
-            url += `&unit=${encodeURIComponent(unit)}`;
-        }
-
-        const data = await getData(url);
-        const prices = data.prices || [];
-
-        if (!prices.length) {
-            $("priceResults").innerHTML =
-                '<div class="empty">ఈ productకు ఈ Wardలో తాజా shop-owner-confirmed ధరలు లేవు.</div>';
-            return;
-        }
-
-        $("priceResults").innerHTML = prices.map((item, index) => `
-            <article class="price-card">
-                <div class="row">
-                    <b>${index + 1}. ${esc(item.shop_name)}</b>
-                    <strong>₹${esc(item.price)}</strong>
-                </div>
-                <p class="detail">
-                    ${esc(item.product_name)} / ${esc(item.unit)}
-                </p>
-                <p class="detail">${esc(item.address || "")}</p>
-                <p class="muted">
-                    Confirmed: ${esc(new Date(item.updated_at).toLocaleString())}
-                </p>
-                ${item.phone
-                    ? `<a href="tel:${esc(item.phone)}">Call Shop</a>`
-                    : ""}
-            </article>
-        `).join("");
-
-    } catch (error) {
-        $("priceResults").innerHTML =
-            `<div class="empty">Comparison error: ${esc(error.message)}</div>`;
-    }
+      `<div class="empty">Comparison error: ${esc(error.message)}</div>`;
+  }
 }
 
+/* EVENTS */
+
 $("ward").addEventListener("change", () => {
-    ward = $("ward").value;
-    loadShops();
+  ward = $("ward").value;
+  loadShops();
+  loadTracker();
 });
 
 $("category").addEventListener("change", event => {
-    setCategory(event.target.value);
+  setCategory(event.target.value);
 });
 
 $("show").addEventListener("click", () => {
-    ward = $("ward").value;
-    category = $("category").value || "All";
-    loadShops();
+  ward = $("ward").value;
+  category = $("category").value || "All";
+  loadShops();
+  loadTracker();
 });
 
 $("reset").addEventListener("click", () => {
-    ward = "";
-    category = "All";
-    shopRows = [];
+  ward = "";
+  category = "All";
+  shopRows = [];
 
-    $("ward").value = "";
-    $("category").value = "All";
+  $("ward").value = "";
+  $("category").value = "All";
 
-    $("shops").innerHTML =
-        '<div class="empty">Ward select చేయండి.</div>';
+  $("shops").innerHTML =
+    '<div class="empty">Ward select చేయండి.</div>';
+  $("offers").innerHTML =
+    '<div class="empty">Ward select చేసిన తర్వాత offers కనిపిస్తాయి.</div>';
+  $("priceResults").innerHTML =
+    '<div class="empty">Ward మరియు product name ఇవ్వండి.</div>';
+  $("trackerStatus").textContent = "Ward మరియు Category select చేయండి.";
+  trackerMessage("ధరలు చూడటానికి Ward మరియు Category select చేయండి.");
 
-    $("offers").innerHTML =
-        '<div class="empty">Ward select చేసిన తర్వాత offers కనిపిస్తాయి.</div>';
-
-    $("priceResults").innerHTML =
-        '<div class="empty">Ward మరియు product name ఇవ్వండి.</div>';
-
-    setCategory("All");
+  setCategory("All");
 });
 
 $("sort").addEventListener("change", renderShops);
 $("compare").addEventListener("click", comparePrices);
+$("trackerSearch").addEventListener("click", loadTracker);
+$("trackerRefresh").addEventListener("click", loadTracker);
 
 initialize();
+startTrackerAutoRefresh();
 </script>
 
 </body>
