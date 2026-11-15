@@ -1,31 +1,324 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BezawadaDeals | Vijayawada Local Price Tracker</title>
+
+<!DOCTYPE html>
+<html lang="te">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0f766e">
+<title>BezawadaDeals - Vijayawada Price Tracker</title>
 <style>
-:root{--green:#087f5b;--dark:#12372d;--bg:#f4f8f6;--line:#dce8e2}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#18352c;font:15px system-ui,Arial}header{background:linear-gradient(120deg,#075b43,#0b9870);color:white;padding:25px 16px}header .wrap,main{max-width:1100px;margin:auto}h1{margin:0 0 6px;font-size:27px}header p{margin:0;opacity:.9}.wrap{padding-left:14px;padding-right:14px}main{padding:18px 14px}.panel{background:white;border:1px solid var(--line);border-radius:14px;padding:16px;margin:0 0 16px;box-shadow:0 3px 12px #12372d0a}h2{font-size:19px;margin:0 0 12px}.controls{display:flex;gap:10px;flex-wrap:wrap}select,input,button{font:inherit;border:1px solid #cbdad2;border-radius:9px;padding:10px;background:white;color:#17372d}select,input{min-width:150px;flex:1}button{background:var(--green);color:white;border:0;cursor:pointer;font-weight:650}button.secondary{background:#e6f3ed;color:#075b43}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px}.cat{padding:11px;border:1px solid var(--line);border-radius:10px;background:#fbfdfc;text-align:left;color:#18352c}.cat.active{background:#e4f4ec;border-color:var(--green)}.muted{color:#65766e;font-size:13px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:11px}.item{border:1px solid var(--line);border-radius:11px;padding:12px;background:#fff}.item strong{display:block;margin-bottom:5px}.price{font-size:20px;font-weight:750;color:#087f5b}.tag{display:inline-block;padding:3px 8px;border-radius:20px;background:#e7f5ed;color:#126342;font-size:12px;margin-top:7px}.tag.expired{background:#fff0e8;color:#a34a18}.tag.wholesale{background:#eaf0ff;color:#334f9b}.row{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.empty{padding:16px;background:#f7faf8;border-radius:10px;color:#64756d}.small{font-size:12px;color:#64756d}footer{text-align:center;color:#738078;padding:20px}
-</style></head><body><header><div class="wrap"><h1>BezawadaDeals</h1><p>Vijayawada local shops • 86 wards • 50 categories • Price comparison</p></div></header>
-<main>
-<section class="panel"><div class="row"><h2>Find local deals</h2><span id="apiState" class="small">Connecting…</span></div><div class="controls"><select id="ward"></select><select id="category"></select><button onclick="refreshAll()">Refresh</button></div></section>
-<section class="panel"><h2>Browse all 50 categories</h2><div id="categoryGrid" class="grid"></div></section>
-<section class="panel"><h2>Local shops</h2><div id="shops" class="cards"><div class="empty">Choose a ward to view listed shops.</div></div></section>
-<section class="panel"><h2>Latest shop-owner price updates</h2><p class="muted">Verified means a shop owner confirmed the current in-store price. Prices expire after 24 hours.</p><div class="controls"><input id="productFilter" placeholder="Filter product name"><select id="sort"><option value="low">Price: Low to high</option><option value="high">Price: High to low</option></select><button onclick="loadTracker()">Compare</button></div><div id="tracker" style="margin-top:12px"><div class="empty">No prices loaded.</div></div></section>
-<section class="panel"><h2>Government mandi prices</h2><p class="muted">AGMARKNET / data.gov.in agricultural wholesale prices. These are mandi prices per quintal, not retail shop prices.</p><div id="mandi"><div class="empty">Loading government feed…</div></div></section>
-<section class="panel"><h2>Shop offers</h2><div id="offers" class="cards"><div class="empty">No offers loaded.</div></div></section>
-<section class="panel"><h2>Retail data availability</h2><p class="muted">Government retail feeds are not available for every category. Categories without a current shop-owner update will show no price rather than an invented rate.</p><div id="sourceInfo" class="small"></div></section>
-</main><footer>BezawadaDeals • Data is shown with its source and update status.</footer>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f4f7f8;color:#17202a}
+header{background:#0f766e;color:white;padding:22px 16px}
+.wrap{max-width:1100px;margin:auto;padding:15px}
+h1{margin:0 0 7px;font-size:26px}
+h2{font-size:20px}
+.panel{background:white;border:1px solid #e2e8f0;border-radius:13px;padding:15px;margin:14px 0}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+input,select,button{font:inherit;border:1px solid #cbd5e1;border-radius:9px;padding:11px;background:white;width:100%}
+button{background:#0f766e;color:white;border:0;font-weight:bold;cursor:pointer}
+.categories,.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px}
+.cat{background:#f0fdfa;color:#115e59;border:1px solid #99f6e4;text-align:left;font-size:13px}
+.cat.active{background:#0f766e;color:white}
+.item{padding:13px;border:1px solid #e2e8f0;border-radius:10px;background:white}
+.price{font-size:21px;font-weight:bold;color:#0f766e;margin:8px 0}
+.status{font-size:12px;background:#dcfce7;color:#166534;padding:4px 8px;border-radius:20px}
+.muted{color:#64748b;font-size:13px}
+.empty{text-align:center;padding:20px;color:#64748b}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+footer{text-align:center;padding:20px;color:#64748b}
+</style>
+</head>
+<body>
+<header>
+<div class="wrap">
+<h1>BezawadaDeals</h1>
+<p>విజయవాడలో ధరలు, షాపులు, ఆఫర్లు ఒకేచోట</p>
+</div>
+</header>
+
+<main class="wrap">
+<section class="panel">
+<div class="row">
+<h2>Live Price Tracker</h2>
+<span id="apiStatus" class="status">Connecting...</span>
+</div>
+<div class="controls">
+<input id="search" placeholder="Search Tomato, Rice, Onion...">
+<select id="ward"><option value="">All Wards</option></select>
+<select id="sort">
+<option value="asc">Low to High</option>
+<option value="desc">High to Low</option>
+</select>
+<button id="refresh">Refresh Prices</button>
+</div>
+<p class="muted">Verified prices, government market rates and shop-owner updates.</p>
+</section>
+
+<section class="panel">
+<h2>All 50 Categories</h2>
+<div id="categories" class="categories"></div>
+</section>
+
+<section class="panel">
+<div class="row">
+<h2 id="resultsTitle">Available Prices</h2>
+<span id="count" class="muted"></span>
+</div>
+<div id="results" class="cards">
+<div class="empty">Loading prices...</div>
+</div>
+</section>
+
+<section class="panel">
+<h2>Government Market Prices</h2>
+<div id="market" class="cards">
+<div class="empty">Loading market prices...</div>
+</div>
+<p class="muted">AGMARKNET prices are wholesale mandi prices, not retail shop prices.</p>
+</section>
+
+<section class="panel">
+<h2>Local Shop Offers</h2>
+<div id="offers" class="cards">
+<div class="empty">Loading offers...</div>
+</div>
+</section>
+</main>
+
+<footer>
+BezawadaDeals | Vijayawada Price Tracker
+</footer>
+
 <script>
-const CATS=["Vegetables","Fruits","Groceries","Rice & Pulses","Dairy & Bakery","Meat & Seafood","Supermarkets","Wholesale Stores","Shopping Malls","Department Stores","Restaurants","Fast Food","Cafes & Tea","Juice & Ice Cream","Sweets & Bakeries","Electronics","Mobile Stores","Computers","Home Appliances","Fashion & Clothing","Footwear","Bags","Jewellery","Accessories","Cosmetics","Medical Stores","Hospitals & Clinics","Optical Stores","Petrol Bunks","Auto Sales & Repair","Hardware","Electrical Stores","Furniture","Home & Kitchen","Books & Stationery","Toys & Baby Products","Sports & Fitness","Flowers","Gifts","Salons & Beauty","Laundry","Photo & Printing","Banks & ATMs","Internet & Mobile Services","Repairs & Services","Education & Coaching","Travel & Transport","Local Services","Pet Shops","Other Shops"];
-const $=id=>document.getElementById(id);let selectedCategory='All';
-async function api(url){const r=await fetch(url);let j=await r.json();if(!r.ok)throw new Error(j.detail||'Request failed');return j}
-function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function money(v){return v==null?'—':'₹'+Number(v).toLocaleString('en-IN',{maximumFractionDigits:2})}
-function badge(s){let cls=s==='Expired'?'expired':s==='Government wholesale'?'wholesale':'';return `<span class="tag ${cls}">${esc(s||'Estimated')}</span>`}
-function categoryUI(){ $('category').innerHTML='<option value="All">All categories</option>'+CATS.map(c=>`<option>${esc(c)}</option>`).join('');$('categoryGrid').innerHTML=CATS.map(c=>`<button class="cat" data-cat="${esc(c)}" onclick="chooseCategory('${c.replace(/'/g,"\\'")}')">${esc(c)}</button>`).join('') }
-function chooseCategory(c){selectedCategory=c;$('category').value=c;document.querySelectorAll('.cat').forEach(b=>b.classList.toggle('active',b.dataset.cat===c));refreshAll()}
-async function loadShops(){const ward=$('ward').value;if(!ward)return;try{const d=await api(`/api/shops?ward_number=${ward}&category=${encodeURIComponent(selectedCategory)}`);$('shops').innerHTML=d.shops.length?d.shops.map(s=>`<article class="item"><strong>${esc(s.shop_name)}</strong><div>${esc(s.category)} • Ward ${s.ward_number}</div><div class="muted">${esc(s.address||s.locality||'Address not provided')}</div><div class="muted">${esc(s.phone||'')}</div><div class="small">${s.price_count} live price entries</div></article>`).join(''):'<div class="empty">No shops listed for this ward and category yet.</div>'}catch(e){$('shops').innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
-async function loadTracker(){const ward=$('ward').value||'';const p=$('productFilter').value.trim();const sort=$('sort').value;const url=`/api/unified-price-tracker?category=${encodeURIComponent(selectedCategory)}&ward_number=${ward}&product=${encodeURIComponent(p)}&sort=${sort}`;try{const d=await api(url);$('tracker').innerHTML=d.prices.length?`<div class="cards">${d.prices.map(x=>`<article class="item"><strong>${esc(x.product_name)}</strong><div class="muted">${esc(x.category)} • ${esc(x.unit)} • Ward ${x.ward_number}</div><div class="price">${money(x.price)}</div><div>${esc(x.shop_name)}</div><div class="muted">${esc(x.address||'')}</div>${badge(x.status)}<div class="small">Updated: ${new Date(x.updated_at).toLocaleString()}</div><div class="small">Source: ${esc(x.source_name||'Shop owner')}</div></article>`).join('')}</div>`:'<div class="empty">Data Not Available. No current shop-owner price has been submitted for this selection.</div>'}catch(e){$('tracker').innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
-async function loadMandi(){try{const d=await api('/api/market-prices?district=Krishna&limit=100');$('mandi').innerHTML=d.prices?.length?`<div class="cards">${d.prices.map(x=>`<article class="item"><strong>${esc(x.commodity)}</strong><div>${esc(x.market||'Market')} • ${esc(x.arrival_date||'')}</div><div class="price">${money(x.modal_price)} <span class="small">/ quintal</span></div><div class="muted">Min ${money(x.min_price)} • Max ${money(x.max_price)}</div>${badge('Government wholesale')}<div class="small">${esc(x.source)}</div></article>`).join('')}</div>`:`<div class="empty">${esc(d.message||'Government feed has no matching records.')}</div>`}catch(e){$('mandi').innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
-async function loadOffers(){try{const w=$('ward').value;const d=await api('/api/offers'+(w?'?ward_number='+w:''));$('offers').innerHTML=d.offers.length?d.offers.map(o=>`<article class="item"><strong>${esc(o.title)}</strong><div>${esc(o.shop_name)} • ${esc(o.category)}</div><div class="price">${esc(o.discount_text||'Offer')}</div><div class="muted">${esc(o.description||'')}</div></article>`).join(''):'<div class="empty">No active offers available.</div>'}catch(e){$('offers').innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
-async function refreshAll(){await Promise.all([loadShops(),loadTracker(),loadOffers()])}
-async function init(){categoryUI();$('ward').innerHTML='<option value="">All wards</option>'+Array.from({length:86},(_,i)=>`<option value="${i+1}">Ward ${i+1}</option>`).join('');$('ward').addEventListener('change',refreshAll);$('category').addEventListener('change',e=>chooseCategory(e.target.value));try{const s=await api('/api/status');$('apiState').textContent=s.database_connected?'API online • Database connected':'API online • Database not connected';}catch(e){$('apiState').textContent='API connection issue'}try{const d=await api('/api/official-sources');$('sourceInfo').textContent=`${d.categories.length} categories listed. Official retail feed: Data Not Available for all categories. ${d.government_wholesale.source} supplies agricultural wholesale data only.`}catch(e){}await Promise.all([refreshAll(),loadMandi()]);}
-init();setInterval(()=>{loadTracker();loadMandi()},300000);
-</script></body></html>
+const API = "";
+const CATEGORIES = [
+"Vegetables","Fruits","Groceries","Rice & Pulses",
+"Dairy & Bakery","Meat & Seafood","Supermarkets",
+"Wholesale Stores","Shopping Malls","Department Stores",
+"Restaurants","Fast Food","Cafes & Tea","Juice & Ice Cream",
+"Sweets & Bakeries","Electronics","Mobile Stores","Computers",
+"Home Appliances","Fashion & Clothing","Footwear","Bags",
+"Jewellery","Accessories","Cosmetics","Medical Stores",
+"Hospitals & Clinics","Optical Stores","Petrol Bunks",
+"Auto Sales & Repair","Hardware","Electrical Stores",
+"Furniture","Home & Kitchen","Books & Stationery",
+"Toys & Baby Products","Sports & Fitness","Flowers","Gifts",
+"Salons & Beauty","Laundry","Photo & Printing","Banks & ATMs",
+"Internet & Mobile Services","Repairs & Services",
+"Education & Coaching","Travel & Transport","Local Services",
+"Pet Shops","Other Shops"
+];
+
+let selectedCategory = "";
+let allPrices = [];
+
+const $ = id => document.getElementById(id);
+
+function escapeHTML(value){
+ return String(value ?? "").replace(/[&<>"']/g, c => ({
+ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+ }[c]));
+}
+
+async function api(path){
+ const response = await fetch(API + path);
+ if(!response.ok) throw new Error("API Error: " + response.status);
+ return response.json();
+}
+
+function getRows(data){
+ if(Array.isArray(data)) return data;
+ if(Array.isArray(data.items)) return data.items;
+ if(Array.isArray(data.results)) return data.results;
+ if(Array.isArray(data.prices)) return data.prices;
+ if(Array.isArray(data.data)) return data.data;
+ return [];
+}
+
+function renderCategories(){
+ $("categories").innerHTML = CATEGORIES.map(category => `
+ <button class="cat ${selectedCategory===category?"active":""}"
+ data-category="${escapeHTML(category)}">
+ ${escapeHTML(category)}
+ </button>
+ `).join("");
+
+ document.querySelectorAll("[data-category]").forEach(button=>{
+  button.addEventListener("click",()=>{
+   selectedCategory =
+    selectedCategory===button.dataset.category
+    ? "" : button.dataset.category;
+   renderCategories();
+   renderPrices();
+  });
+ });
+}
+
+function renderPrices(){
+ const search = $("search").value.trim().toLowerCase();
+ const ward = $("ward").value;
+
+ let rows = allPrices.filter(p=>{
+  const category = String(p.category || p.product_category || "");
+  const name = String(p.product_name || p.product || p.name || "");
+  const wardNumber = String(p.ward_number ?? p.ward ?? "");
+
+  return (!selectedCategory ||
+   category.toLowerCase()===selectedCategory.toLowerCase()) &&
+   (!search || name.toLowerCase().includes(search)) &&
+   (!ward || wardNumber===ward);
+ });
+
+ rows.sort((a,b)=>{
+  const x = Number(a.price ?? a.price_per_unit ?? 0);
+  const y = Number(b.price ?? b.price_per_unit ?? 0);
+  return $("sort").value==="asc" ? x-y : y-x;
+ });
+
+ $("count").textContent = rows.length + " results";
+ $("resultsTitle").textContent = selectedCategory || "Available Prices";
+
+ if(!rows.length){
+  $("results").innerHTML =
+   '<div class="empty">ఈ ఎంపికకు ధరలు అందుబాటులో లేవు. Shop owner update వచ్చినప్పుడు ఇక్కడ కనిపిస్తాయి.</div>';
+  return;
+ }
+
+ $("results").innerHTML = rows.map(p=>{
+  const name = p.product_name || p.product || p.name || "Product";
+  const price = p.price ?? p.price_per_unit;
+  const unit = p.unit || "unit";
+  const shop = p.shop_name || p.shop || "";
+  const location = p.ward_name ||
+   (p.ward_number ? "Ward " + p.ward_number : "Vijayawada");
+  const status = p.status || p.price_status || "Estimated";
+
+  return `
+  <article class="item">
+   <div class="row">
+    <b>${escapeHTML(name)}</b>
+    <span class="status">${escapeHTML(status)}</span>
+   </div>
+   <div class="price">
+    ${price==null ? "Price unavailable" : "₹"+escapeHTML(price)}
+    <small class="muted">/ ${escapeHTML(unit)}</small>
+   </div>
+   <div class="muted">${escapeHTML(shop)} ${shop?"· ":""}${escapeHTML(location)}</div>
+   <div class="muted">Updated: ${escapeHTML(p.updated_at || p.date || "Not specified")}</div>
+  </article>`;
+ }).join("");
+}
+
+async function loadPrices(){
+ $("results").innerHTML='<div class="empty">Loading prices...</div>';
+
+ try{
+  let data;
+  try{
+   data = await api("/api/unified-price-tracker");
+  }catch(error){
+   data = await api("/api/price-tracker");
+  }
+
+  allPrices = getRows(data);
+  $("apiStatus").textContent = "API Connected";
+  renderPrices();
+ }catch(error){
+  $("apiStatus").textContent = "API Unavailable";
+  $("results").innerHTML =
+   '<div class="empty">Price API అందుబాటులో లేదు. Refresh చేయండి.</div>';
+ }
+}
+
+async function loadWards(){
+ try{
+  const data = await api("/api/wards");
+  const wards = getRows(data);
+
+  wards.forEach(w=>{
+   const number = w.ward_number ?? w.number ?? w.id;
+   if(number==null) return;
+
+   const option = document.createElement("option");
+   option.value = String(number);
+   option.textContent = w.ward_name || "Ward " + number;
+   $("ward").appendChild(option);
+  });
+ }catch(error){
+  console.log("Ward loading failed",error);
+ }
+}
+
+async function loadMarket(){
+ try{
+  const data = await api("/api/market-prices");
+  const rows = getRows(data);
+
+  if(!rows.length){
+   $("market").innerHTML =
+    '<div class="empty">Government market feed data ప్రస్తుతం అందుబాటులో లేదు.</div>';
+   return;
+  }
+
+  $("market").innerHTML = rows.slice(0,20).map(p=>`
+   <article class="item">
+    <b>${escapeHTML(p.commodity || p.product || p.name || "Commodity")}</b>
+    <div class="price">₹${escapeHTML(p.modal_price ?? p.price ?? "—")}</div>
+    <div class="muted">
+     ${escapeHTML(p.market || p.market_name || "Market")}
+     · ${escapeHTML(p.date || p.arrival_date || "")}
+    </div>
+   </article>
+  `).join("");
+ }catch(error){
+  $("market").innerHTML =
+   '<div class="empty">Government market feed unavailable.</div>';
+ }
+}
+
+async function loadOffers(){
+ try{
+  const data = await api("/api/offers");
+  const rows = getRows(data);
+
+  if(!rows.length){
+   $("offers").innerHTML =
+    '<div class="empty">ప్రస్తుతం offers అందుబాటులో లేవు.</div>';
+   return;
+  }
+
+  $("offers").innerHTML = rows.map(o=>`
+   <article class="item">
+    <b>${escapeHTML(o.title || o.offer_title || o.product_name || "Offer")}</b>
+    <p>${escapeHTML(o.description || o.offer_description || "")}</p>
+    <div class="muted">${escapeHTML(o.shop_name || "Local Shop")}</div>
+   </article>
+  `).join("");
+ }catch(error){
+  $("offers").innerHTML =
+   '<div class="empty">Offers ప్రస్తుతం అందుబాటులో లేవు.</div>';
+ }
+}
+
+$("search").addEventListener("input",renderPrices);
+$("ward").addEventListener("change",renderPrices);
+$("sort").addEventListener("change",renderPrices);
+
+$("refresh").addEventListener("click",()=>{
+ loadPrices();
+ loadMarket();
+ loadOffers();
+});
+
+renderCategories();
+
+Promise.all([
+ loadWards(),
+ loadPrices(),
+ loadMarket(),
+ loadOffers()
+]);
+</script>
+</body>
+</html>
