@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi import Request
 
-APP_VERSION = "10.0.0"
+APP_VERSION = "10.0.1"
 TOTAL_WARDS = 86
 AGMARKNET_RESOURCE = "9ef84268-d588-465a-a308-a864a43d0070"
 CATEGORIES = [
@@ -64,6 +64,9 @@ def init_db():
     """
     with db() as conn:
         conn.execute(sql)
+        # Safe migration: CREATE TABLE IF NOT EXISTS does not add columns
+        # to an existing Render PostgreSQL table created by an older version.
+        conn.execute("ALTER TABLE wards ADD COLUMN IF NOT EXISTS ward_name TEXT")
         for n in range(1, TOTAL_WARDS + 1):
             conn.execute("INSERT INTO wards(ward_number,ward_name) VALUES(%s,%s) ON CONFLICT(ward_number) DO NOTHING", (n, f"Ward {n}"))
 
