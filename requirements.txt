@@ -1,5 +1,5 @@
 fastapi
-uvicorn
+uvicorn[standard]
+psycopg[binary]
 jinja2
 python-multipart
-psycopg[binary]>=3.2
