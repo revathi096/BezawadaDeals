@@ -2,307 +2,589 @@
 <html lang="te">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0f766e">
-<title>BezawadaDeals - Vijayawada Price Tracker</title>
+<title>BezawadaDeals | Vijayawada</title>
+
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f4f7f8;color:#17202a}
-header{background:#0f766e;color:white;padding:22px 16px}
-.wrap{max-width:1100px;margin:auto;padding:15px}
-h1{margin:0 0 7px;font-size:26px}
+body{margin:0;background:#f3f6f7;color:#17202a;font-family:Arial,sans-serif}
+header{background:#0f766e;color:white;padding:24px 16px}
+.wrap{max-width:1150px;margin:auto;padding:15px}
+h1{margin:0;font-size:27px}
 h2{font-size:20px}
-.panel{background:white;border:1px solid #e2e8f0;border-radius:13px;padding:15px;margin:14px 0}
+.panel{background:white;border:1px solid #e2e8f0;border-radius:14px;padding:16px;margin:14px 0}
 .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
-input,select,button{font:inherit;border:1px solid #cbd5e1;border-radius:9px;padding:11px;background:white;width:100%}
+input,select,button,textarea{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:9px;font:inherit;background:white}
 button{background:#0f766e;color:white;border:0;font-weight:bold;cursor:pointer}
-.categories,.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px}
-.cat{background:#f0fdfa;color:#115e59;border:1px solid #99f6e4;text-align:left;font-size:13px}
-.cat.active{background:#0f766e;color:white}
-.item{padding:13px;border:1px solid #e2e8f0;border-radius:10px;background:white}
-.price{font-size:21px;font-weight:bold;color:#0f766e;margin:8px 0}
-.status{font-size:12px;background:#dcfce7;color:#166534;padding:4px 8px;border-radius:20px}
+button.secondary{background:#334155}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.card{border:1px solid #e2e8f0;border-radius:11px;padding:13px;background:white;min-width:0}
+.card h3{font-size:16px;margin:0 0 8px}
+.price{font-size:23px;color:#0f766e;font-weight:bold;margin:9px 0}
 .muted{color:#64748b;font-size:13px}
-.empty{text-align:center;padding:20px;color:#64748b}
+.status{display:inline-block;padding:5px 9px;border-radius:20px;background:#dcfce7;color:#166534;font-size:12px}
+.warning{background:#fff7ed;color:#9a3412}
+.empty{padding:22px;text-align:center;color:#64748b}
 .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-footer{text-align:center;padding:20px;color:#64748b}
+.category{background:#ecfdf5;color:#115e59;border:1px solid #99f6e4;text-align:left;font-size:13px}
+.category.active{background:#0f766e;color:white}
+.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+small{color:#64748b}
+footer{text-align:center;padding:25px;color:#64748b}
+.hidden{display:none}
+hr{border:0;border-top:1px solid #e2e8f0;margin:16px 0}
 </style>
 </head>
+
 <body>
 <header>
 <div class="wrap">
 <h1>BezawadaDeals</h1>
-<p>విజయవాడలో ధరలు, షాపులు, ఆఫర్లు ఒకేచోట</p>
+<p>విజయవాడలో షాపులు, ధరలు, ఆఫర్లు ఒకేచోట</p>
+<span id="connection" class="status warning">Connecting...</span>
 </div>
 </header>
 
 <main class="wrap">
+
 <section class="panel">
-<div class="row">
-<h2>Live Price Tracker</h2>
-<span id="apiStatus" class="status">Connecting...</span>
-</div>
+<h2>విజయవాడ Area Search</h2>
+
 <div class="controls">
-<input id="search" placeholder="Search Tomato, Rice, Onion...">
-<select id="ward"><option value="">All Wards</option></select>
-<select id="sort">
-<option value="asc">Low to High</option>
-<option value="desc">High to Low</option>
+<select id="ward">
+<option value="">All 86 Wards</option>
 </select>
-<button id="refresh">Refresh Prices</button>
-</div>
-<p class="muted">Verified prices, government market rates and shop-owner updates.</p>
-</section>
 
-<section class="panel">
-<h2>All 50 Categories</h2>
-<div id="categories" class="categories"></div>
+<select id="locality">
+<option value="">All Localities</option>
+</select>
+
+<select id="categoryFilter">
+<option value="All">All 50 Categories</option>
+</select>
+
+<input id="search" placeholder="Search product or shop">
+<select id="sort">
+<option value="low">Price: Low to High</option>
+<option value="high">Price: High to Low</option>
+</select>
+<button id="refresh">Refresh</button>
+</div>
+
+<p class="muted">
+ప్రాంతం పేరు shop registration సమయంలో owner/admin నమోదు చేసినప్పుడు కనిపిస్తుంది.
+ధృవీకరించని ward-locality mapping చూపించబడదు.
+</p>
 </section>
 
 <section class="panel">
 <div class="row">
-<h2 id="resultsTitle">Available Prices</h2>
-<span id="count" class="muted"></span>
+<h2>All 50 Categories</h2>
+<span id="categoryCount" class="muted"></span>
 </div>
-<div id="results" class="cards">
-<div class="empty">Loading prices...</div>
+<div id="categories" class="grid"></div>
+</section>
+
+<section class="panel">
+<div class="row">
+<h2>Shop Price Tracker</h2>
+<span id="priceCount" class="muted">0 prices</span>
+</div>
+<div id="prices" class="grid">
+<div class="empty">Loading...</div>
+</div>
+</section>
+
+<section class="panel">
+<h2>Nearby Shops</h2>
+<div id="shops" class="grid">
+<div class="empty">Loading shops...</div>
 </div>
 </section>
 
 <section class="panel">
 <h2>Government Market Prices</h2>
-<div id="market" class="cards">
+<p class="muted">
+AGMARKNET prices are wholesale mandi prices, not retail shop prices.
+</p>
+<div id="market" class="grid">
 <div class="empty">Loading market prices...</div>
 </div>
-<p class="muted">AGMARKNET prices are wholesale mandi prices, not retail shop prices.</p>
 </section>
 
 <section class="panel">
 <h2>Local Shop Offers</h2>
-<div id="offers" class="cards">
+<div id="offers" class="grid">
 <div class="empty">Loading offers...</div>
 </div>
 </section>
+
+<section class="panel">
+<h2>Shop Owner Price Update</h2>
+<p class="muted">
+Shop owner మాత్రమే తనకు ఇచ్చిన private token ఉపయోగించి ధర update చేయాలి.
+ధర 24 గంటల వరకు Verifiedగా ఉంటుంది.
+</p>
+
+<div class="formgrid">
+<input id="ownerToken" placeholder="Shop owner token">
+<input id="ownerProduct" placeholder="Product name (e.g. Tomato)">
+<select id="ownerCategory"></select>
+<input id="ownerUnit" placeholder="Unit (kg, litre, piece)" value="kg">
+<input id="ownerPrice" type="number" min="0.01" step="0.01" placeholder="Current shop price">
+</div>
+
+<p>
+<label>
+<input id="confirmPrice" type="checkbox" style="width:auto">
+నేను ఇచ్చిన ధర ప్రస్తుతం నా షాప్‌లో ఉన్న ధరే.
+</label>
+</p>
+
+<button id="submitPrice">Submit Verified Price</button>
+<p id="ownerMessage" class="muted"></p>
+</section>
+
+<section class="panel">
+<h2>Admin: Register Shop</h2>
+<p class="muted">
+ఈ form ఉపయోగించడానికి Renderలో ADMIN_TOKEN configure చేయాలి.
+</p>
+
+<div class="formgrid">
+<input id="adminToken" type="password" placeholder="Admin token">
+<input id="shopName" placeholder="Shop name">
+<select id="adminCategory"></select>
+<select id="adminWard"></select>
+<input id="shopLocality" placeholder="Verified locality / area">
+<input id="shopAddress" placeholder="Shop address">
+<input id="shopPhone" placeholder="Shop phone">
+<input id="shopOwner" placeholder="Owner name">
+</div>
+
+<button id="registerShop">Register Shop</button>
+<p id="adminMessage" class="muted"></p>
+</section>
+
+<section class="panel">
+<h2>Data Sources & Status</h2>
+<div id="systemStatus" class="muted">Checking...</div>
+<p class="muted">
+Retail prices: Shop-owner confirmed updates only.
+Government prices: AGMARKNET agricultural wholesale data.
+No invented prices are displayed.
+</p>
+</section>
+
 </main>
 
-<footer>BezawadaDeals | Vijayawada Price Tracker</footer>
+<footer>
+BezawadaDeals · Vijayawada · Price information and local shop directory
+</footer>
 
 <script>
-const API = "";
-let CATEGORIES = [];
-let selectedCategory = "";
-let allPrices = [];
-
 const $ = id => document.getElementById(id);
 
-function escapeHTML(value){
+let categories = [];
+let wards = [];
+let selectedCategory = "All";
+
+function esc(value){
  return String(value ?? "").replace(/[&<>"']/g, c => ({
- "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
  }[c]));
 }
 
-async function api(path){
- const response = await fetch(API + path, {
-  headers: {"Accept":"application/json"}
+async function api(path, options={}){
+ const response = await fetch(path, {
+  ...options,
+  headers:{
+   "Content-Type":"application/json",
+   ...(options.headers || {})
+  }
  });
- if(!response.ok) throw new Error("API Error: " + response.status);
- return response.json();
+
+ const data = await response.json().catch(()=>({}));
+
+ if(!response.ok){
+  throw new Error(data.detail || data.message || "API error " + response.status);
+ }
+
+ return data;
 }
 
-function getRows(data, key){
- if(Array.isArray(data)) return data;
- if(key && Array.isArray(data[key])) return data[key];
- if(Array.isArray(data.items)) return data.items;
- if(Array.isArray(data.results)) return data.results;
- if(Array.isArray(data.data)) return data.data;
- return [];
+function fillCategorySelect(elementId){
+ $(elementId).innerHTML = categories.map(c =>
+  `<option value="${esc(c)}">${esc(c)}</option>`
+ ).join("");
+}
+
+async function loadStatus(){
+ try{
+  const data = await api("/api/status");
+
+  $("connection").textContent =
+   data.database_connected ? "Database Connected" : "Database Disconnected";
+
+  $("connection").className =
+   data.database_connected ? "status" : "status warning";
+
+  $("systemStatus").textContent =
+   `Version ${data.version} · Database: ${data.database_connected ? "Connected" : "Disconnected"} · Wards: ${data.wards} · Categories: ${data.categories}`;
+
+ }catch(error){
+  $("connection").textContent = "Connection Error";
+  $("systemStatus").textContent = error.message;
+ }
 }
 
 async function loadCategories(){
- try{
-  const data = await api("/api/categories");
-  const names = getRows(data,"categories");
-  if(names.length) CATEGORIES = names;
- }catch(error){
-  console.error("Categories:",error);
- }
- renderCategories();
-}
+ const data = await api("/api/categories");
+ categories = data.categories || [];
 
-function renderCategories(){
- $("categories").innerHTML = CATEGORIES.map(category => `
- <button class="cat ${selectedCategory===category?"active":""}"
- data-category="${escapeHTML(category)}">
- ${escapeHTML(category)}
- </button>
+ $("categoryFilter").innerHTML =
+  '<option value="All">All 50 Categories</option>' +
+  categories.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
+
+ fillCategorySelect("ownerCategory");
+ fillCategorySelect("adminCategory");
+
+ $("categoryCount").textContent = categories.length + " categories";
+
+ $("categories").innerHTML = categories.map(c=>`
+  <button class="category ${selectedCategory===c?"active":""}"
+   data-category="${esc(c)}">${esc(c)}</button>
  `).join("");
 
  document.querySelectorAll("[data-category]").forEach(button=>{
   button.addEventListener("click",()=>{
    selectedCategory =
-    selectedCategory===button.dataset.category
-    ? "" : button.dataset.category;
+    selectedCategory === button.dataset.category
+     ? "All" : button.dataset.category;
+
+   $("categoryFilter").value = selectedCategory;
    renderCategories();
-   renderPrices();
+   loadPrices();
+   loadShops();
   });
+ });
+}
+
+function renderCategories(){
+ document.querySelectorAll("[data-category]").forEach(button=>{
+  button.classList.toggle(
+   "active",
+   button.dataset.category===selectedCategory
+  );
  });
 }
 
 async function loadWards(){
+ const data = await api("/api/wards");
+ wards = data.wards || [];
+
+ const options = wards.map(w=>{
+  const label = w.area_name
+   ? `${w.ward_name} — ${w.area_name}`
+   : `${w.ward_name} — Locality details not registered`;
+
+  return `<option value="${w.ward_number}">${esc(label)}</option>`;
+ }).join("");
+
+ $("ward").innerHTML =
+  '<option value="">All 86 Wards</option>' + options;
+
+ $("adminWard").innerHTML = options;
+}
+
+async function loadLocalities(){
+ const ward = $("ward").value;
+ const query = ward ? "?ward_number=" + encodeURIComponent(ward) : "";
+
  try{
-  const data = await api("/api/wards");
-  const wards = getRows(data,"wards");
-  $("ward").innerHTML = '<option value="">All Wards</option>';
+  const data = await api("/api/localities" + query);
+  const localities = data.localities || [];
 
-  wards.forEach(w=>{
-   const number = w.ward_number ?? w.number;
-   if(number==null) return;
-   const option = document.createElement("option");
-   option.value = String(number);
-   option.textContent = w.ward_name || "Ward " + number;
-   $("ward").appendChild(option);
-  });
+  $("locality").innerHTML =
+   '<option value="">All Localities</option>' +
+   localities.map(l=>
+    `<option value="${esc(l.locality_name)}">${esc(l.locality_name)}</option>`
+   ).join("");
 
-  if(!wards.length){
-   $("ward").innerHTML='<option value="">Ward data unavailable</option>';
-  }
  }catch(error){
-  $("ward").innerHTML='<option value="">Ward API unavailable</option>';
-  console.error("Wards:",error);
+  $("locality").innerHTML =
+   '<option value="">Localities unavailable</option>';
  }
 }
 
-function renderPrices(){
- const search = $("search").value.trim().toLowerCase();
+function makeParams(){
+ const params = new URLSearchParams();
+
+ const category = $("categoryFilter").value;
  const ward = $("ward").value;
+ const locality = $("locality").value;
+ const search = $("search").value.trim();
 
- let rows = allPrices.filter(p=>{
-  const category = String(p.category || "");
-  const name = String(p.product_name || "");
-  const wardNumber = String(p.ward_number ?? "");
+ if(category && category!=="All") params.set("category",category);
+ if(ward) params.set("ward_number",ward);
+ if(locality) params.set("locality",locality);
+ if(search) params.set("product",search);
+ params.set("sort",$("sort").value);
 
-  return (!selectedCategory ||
-   category.toLowerCase()===selectedCategory.toLowerCase()) &&
-   (!search || name.toLowerCase().includes(search)) &&
-   (!ward || wardNumber===ward);
- });
-
- rows.sort((a,b)=>{
-  const x = Number(a.price ?? 0);
-  const y = Number(b.price ?? 0);
-  return $("sort").value==="asc" ? x-y : y-x;
- });
-
- $("count").textContent = rows.length + " results";
- $("resultsTitle").textContent = selectedCategory || "Available Prices";
-
- if(!rows.length){
-  $("results").innerHTML =
-   '<div class="empty">ఈ ఎంపికకు ధరలు అందుబాటులో లేవు. Shop owner update వచ్చినప్పుడు కనిపిస్తాయి.</div>';
-  return;
- }
-
- $("results").innerHTML = rows.map(p=>`
-  <article class="item">
-   <div class="row">
-    <b>${escapeHTML(p.product_name)}</b>
-    <span class="status">${escapeHTML(p.status || "Estimated")}</span>
-   </div>
-   <div class="price">
-    ₹${escapeHTML(p.price)}
-    <small class="muted">/ ${escapeHTML(p.unit || "unit")}</small>
-   </div>
-   <div class="muted">
-    ${escapeHTML(p.shop_name || "")}
-    · Ward ${escapeHTML(p.ward_number ?? "")}
-   </div>
-   <div class="muted">Updated: ${escapeHTML(p.updated_at || "Not specified")}</div>
-  </article>
- `).join("");
+ return params;
 }
 
 async function loadPrices(){
- $("results").innerHTML='<div class="empty">Loading prices...</div>';
+ $("prices").innerHTML = '<div class="empty">Loading prices...</div>';
+
+ try{
+  const data = await api(
+   "/api/unified-price-tracker?" + makeParams().toString()
+  );
+
+  const rows = data.prices || [];
+  $("priceCount").textContent = `${rows.length} prices`;
+
+  if(!rows.length){
+   $("prices").innerHTML =
+    '<div class="empty">ప్రస్తుతం verified retail prices లేవు. Shop owners update చేసిన తర్వాత ఇక్కడ కనిపిస్తాయి.</div>';
+   return;
+  }
+
+  $("prices").innerHTML = rows.map(p=>`
+   <article class="card">
+    <h3>${esc(p.product_name)}</h3>
+    <span class="status">${esc(p.status)}</span>
+    <div class="price">₹${esc(p.price)} / ${esc(p.unit)}</div>
+    <b>${esc(p.shop_name)}</b>
+    <p class="muted">${esc(p.locality || "")}</p>
+    <p class="muted">${esc(p.ward_name || ("Ward " + p.ward_number))}</p>
+    <p class="muted">${esc(p.address || "")}</p>
+    <p class="muted">Updated: ${esc(p.updated_at || "")}</p>
+    ${p.phone ? `<a href="tel:${esc(p.phone)}">Call Shop</a>` : ""}
+   </article>
+  `).join("");
+
+ }catch(error){
+  $("prices").innerHTML =
+   `<div class="empty">${esc(error.message)}</div>`;
+ }
+}
+
+async function loadShops(){
+ $("shops").innerHTML = '<div class="empty">Loading shops...</div>';
+
  try{
   const params = new URLSearchParams();
-  if(selectedCategory) params.set("category",selectedCategory);
   if($("ward").value) params.set("ward_number",$("ward").value);
+  if($("categoryFilter").value!=="All"){
+   params.set("category",$("categoryFilter").value);
+  }
+  if($("locality").value) params.set("locality",$("locality").value);
 
-  const data = await api("/api/unified-price-tracker?" + params.toString());
-  allPrices = getRows(data,"prices");
-  $("apiStatus").textContent = "API Connected";
-  renderPrices();
+  const data = await api("/api/shops?" + params.toString());
+  const rows = data.shops || [];
+
+  if(!rows.length){
+   $("shops").innerHTML =
+    '<div class="empty">ఈ ప్రాంతంలో shops ఇంకా register కాలేదు.</div>';
+   return;
+  }
+
+  $("shops").innerHTML = rows.map(s=>`
+   <article class="card">
+    <h3>${esc(s.shop_name)}</h3>
+    <span class="status">${esc(s.category)}</span>
+    <p>${esc(s.locality || "")}</p>
+    <p class="muted">${esc(s.ward_name || ("Ward "+s.ward_number))}</p>
+    <p class="muted">${esc(s.address || "")}</p>
+    <p class="muted">${esc(s.price_count)} current prices</p>
+    ${s.phone ? `<a href="tel:${esc(s.phone)}">Call ${esc(s.phone)}</a>` : ""}
+   </article>
+  `).join("");
+
  }catch(error){
-  $("apiStatus").textContent = "API Unavailable";
-  $("results").innerHTML='<div class="empty">Price API అందుబాటులో లేదు.</div>';
-  console.error("Prices:",error);
+  $("shops").innerHTML =
+   `<div class="empty">${esc(error.message)}</div>`;
  }
 }
 
 async function loadMarket(){
+ $("market").innerHTML = '<div class="empty">Loading government data...</div>';
+
  try{
   const data = await api("/api/market-prices");
-  const rows = getRows(data,"prices");
 
-  if(!rows.length){
-   $("market").innerHTML='<div class="empty">'+
-    escapeHTML(data.message || "Government market feed data అందుబాటులో లేదు.")+
-    '</div>';
+  if(!data.prices || !data.prices.length){
+   $("market").innerHTML =
+    `<div class="empty">${esc(data.message || "Government feed has no available records.")}</div>`;
    return;
   }
 
-  $("market").innerHTML = rows.map(p=>`
-   <article class="item">
-    <b>${escapeHTML(p.commodity || "Commodity")}</b>
-    <div class="price">₹${escapeHTML(p.modal_price ?? "—")}</div>
-    <div class="muted">${escapeHTML(p.market || "")} · ${escapeHTML(p.arrival_date || "")}</div>
-    <div class="muted">Per quintal · Government wholesale</div>
+  $("market").innerHTML = data.prices.map(p=>`
+   <article class="card">
+    <h3>${esc(p.commodity)}</h3>
+    <div class="price">₹${esc(p.modal_price)}</div>
+    <p>${esc(p.market || "")}</p>
+    <p class="muted">${esc(p.district || "")} · ${esc(p.arrival_date || "")}</p>
+    <span class="status warning">Wholesale · Per quintal</span>
    </article>
   `).join("");
+
  }catch(error){
-  $("market").innerHTML='<div class="empty">Government market feed unavailable.</div>';
-  console.error("Market:",error);
+  $("market").innerHTML =
+   `<div class="empty">${esc(error.message)}</div>`;
  }
 }
 
 async function loadOffers(){
  try{
-  const data = await api("/api/offers");
-  const rows = getRows(data,"offers");
+  const ward = $("ward").value;
+  const path = ward ? `/api/offers?ward_number=${ward}` : "/api/offers";
+  const data = await api(path);
+  const rows = data.offers || [];
 
   if(!rows.length){
-   $("offers").innerHTML='<div class="empty">ప్రస్తుతం offers అందుబాటులో లేవు.</div>';
+   $("offers").innerHTML =
+    '<div class="empty">ప్రస్తుతం offers లేవు.</div>';
    return;
   }
 
   $("offers").innerHTML = rows.map(o=>`
-   <article class="item">
-    <b>${escapeHTML(o.title)}</b>
-    <p>${escapeHTML(o.description || "")}</p>
-    <div class="price">${escapeHTML(o.discount_text || "")}</div>
-    <div class="muted">${escapeHTML(o.shop_name || "Local Shop")}</div>
+   <article class="card">
+    <h3>${esc(o.title)}</h3>
+    <p>${esc(o.description || "")}</p>
+    <div class="price">${esc(o.discount_text || "")}</div>
+    <b>${esc(o.shop_name)}</b>
+    <p class="muted">${esc(o.locality || "")} · Ward ${esc(o.ward_number)}</p>
    </article>
   `).join("");
+
  }catch(error){
-  $("offers").innerHTML='<div class="empty">Offers API unavailable.</div>';
-  console.error("Offers:",error);
+  $("offers").innerHTML =
+   `<div class="empty">${esc(error.message)}</div>`;
+ }
+}
+
+async function updatePrice(){
+ const token = $("ownerToken").value.trim();
+ const product = $("ownerProduct").value.trim();
+ const category = $("ownerCategory").value;
+ const unit = $("ownerUnit").value.trim();
+ const price = Number($("ownerPrice").value);
+ const confirmed = $("confirmPrice").checked;
+
+ if(!token || !product || !price || !confirmed){
+  $("ownerMessage").textContent =
+   "Token, product, price మరియు confirmation అవసరం.";
+  return;
+ }
+
+ try{
+  const data = await api("/api/shop/price-update",{
+   method:"POST",
+   headers:{"X-Shop-Token":token},
+   body:JSON.stringify({
+    product_name:product,
+    category,
+    unit,
+    price,
+    confirm_same_as_shop_price:true
+   })
+  });
+
+  $("ownerMessage").textContent =
+   "Price update successful. Verified for 24 hours.";
+
+  $("ownerPrice").value = "";
+  await loadPrices();
+
+ }catch(error){
+  $("ownerMessage").textContent = error.message;
+ }
+}
+
+async function registerShop(){
+ const token = $("adminToken").value.trim();
+
+ const payload = {
+  shop_name:$("shopName").value.trim(),
+  category:$("adminCategory").value,
+  ward_number:Number($("adminWard").value),
+  locality:$("shopLocality").value.trim(),
+  address:$("shopAddress").value.trim(),
+  phone:$("shopPhone").value.trim(),
+  owner_name:$("shopOwner").value.trim()
+ };
+
+ if(!token || !payload.shop_name || !payload.locality){
+  $("adminMessage").textContent =
+   "Admin token, shop name మరియు locality అవసరం.";
+  return;
+ }
+
+ try{
+  const data = await api("/api/admin/shops",{
+   method:"POST",
+   headers:{"X-Admin-Token":token},
+   body:JSON.stringify(payload)
+  });
+
+  $("adminMessage").textContent =
+   "Shop registered. Owner token: " + data.shop_update_token;
+
+  $("shopName").value = "";
+  $("shopLocality").value = "";
+  $("shopAddress").value = "";
+  $("shopPhone").value = "";
+  $("shopOwner").value = "";
+
+  await loadWards();
+  await loadLocalities();
+  await loadShops();
+
+ }catch(error){
+  $("adminMessage").textContent = error.message;
  }
 }
 
 async function refreshAll(){
  await Promise.allSettled([
-  loadWards(),
+  loadStatus(),
   loadCategories(),
+  loadWards()
+ ]);
+
+ await loadLocalities();
+
+ await Promise.allSettled([
   loadPrices(),
+  loadShops(),
   loadMarket(),
   loadOffers()
  ]);
 }
 
-$("search").addEventListener("input",renderPrices);
-$("ward").addEventListener("change",loadPrices);
-$("sort").addEventListener("change",renderPrices);
 $("refresh").addEventListener("click",refreshAll);
+$("ward").addEventListener("change",async()=>{
+ await loadLocalities();
+ await Promise.all([loadPrices(),loadShops(),loadOffers()]);
+});
+$("locality").addEventListener("change",()=>{
+ loadPrices();
+ loadShops();
+});
+$("categoryFilter").addEventListener("change",()=>{
+ selectedCategory=$("categoryFilter").value;
+ renderCategories();
+ loadPrices();
+ loadShops();
+});
+$("search").addEventListener("input",loadPrices);
+$("sort").addEventListener("change",loadPrices);
+$("submitPrice").addEventListener("click",updatePrice);
+$("registerShop").addEventListener("click",registerShop);
 
 refreshAll();
 </script>
