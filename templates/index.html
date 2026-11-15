@@ -1,458 +1,547 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="te">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BezawadaDeals | Vijayawada Shopping</title>
-<meta name="theme-color" content="#087443">
-
+<title>BezawadaDeals - Vijayawada</title>
 <style>
-:root {
- --green:#087443;
- --green2:#15965b;
- --light:#eaf7ef;
- --bg:#f5f8f6;
- --text:#202923;
- --muted:#68756d;
- --border:#e0e8e2;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
-button,input,select{font:inherit}
-button{cursor:pointer}
+:root{--green:#087443;--light:#eaf7ef;--bg:#f5f8f6;--text:#202923;--muted:#68756d;--line:#e0e8e2}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
 .container{width:min(1200px,94%);margin:auto}
-header{background:white;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
-.header{min-height:70px;display:flex;align-items:center;justify-content:space-between}
-.logo{font-size:23px;font-weight:bold;color:var(--green)}
-select{padding:12px;border:1px solid var(--border);border-radius:9px;background:white;width:100%;min-height:46px}
-.hero{background:linear-gradient(120deg,#075c39,#15965b);color:white;padding:45px 0}
-.hero h1{font-size:clamp(27px,5vw,40px);margin-bottom:10px}
-.hero p{opacity:.9}
-.search{display:flex;gap:8px;margin-top:22px;max-width:650px}
-.search input{flex:1;min-width:0;padding:13px;border:0;border-radius:8px}
-.primary{background:var(--green);color:white;border:0;padding:12px 20px;border-radius:8px;font-weight:bold}
-.secondary{background:white;color:var(--green);border:1px solid var(--green);padding:11px 18px;border-radius:8px}
-.section{padding:28px 0}
-.heading{margin-bottom:16px}
-.heading h2{font-size:23px}
-.heading p{color:var(--muted);font-size:13px}
-.panel{background:white;border:1px solid var(--border);border-radius:14px;padding:18px}
-.filters{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.field label{display:block;font-weight:bold;font-size:13px;margin-bottom:7px}
-.actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
-.category-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
-.category-card{border:1px solid var(--border);background:white;border-radius:12px;padding:15px 8px;text-align:center;min-height:95px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;color:var(--text)}
-.category-card:hover,.category-card.active{border:2px solid var(--green);background:var(--light);color:var(--green)}
-.category-icon{font-size:25px}
-.category-name{font-size:12px;font-weight:bold}
-.results{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
-.results p{color:var(--muted)}
-.shop-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.shop-card{background:white;border:1px solid var(--border);border-radius:12px;overflow:hidden}
-.shop-image{height:175px;background:#eaf1ec;display:grid;place-items:center}
-.shop-image img{width:100%;height:100%;object-fit:cover}
-.shop-content{padding:15px}
-.shop-content h3{font-size:17px}
-.shop-category{display:inline-block;color:var(--green);background:var(--light);padding:4px 9px;border-radius:20px;font-size:11px;margin:7px 0}
-.detail{font-size:13px;color:var(--muted);margin-top:7px;overflow-wrap:anywhere}
-.price{background:#f4f8f5;padding:10px;border-radius:8px;margin-top:10px}
-.shop-actions{display:flex;gap:8px;margin-top:12px}
-.shop-actions a{flex:1;text-align:center;padding:9px;border-radius:7px;font-size:12px}
-.map-link{background:var(--light);color:var(--green)}
-.call-link{background:var(--green);color:white}
-.empty,.loading,.error{background:white;border:1px solid var(--border);border-radius:12px;padding:25px;text-align:center;color:var(--muted);grid-column:1/-1}
-.error{color:#c33}
-footer{background:#123c29;color:white;padding:25px 0;margin-top:30px}
-.hidden{display:none!important}
-@media(max-width:850px){.category-grid{grid-template-columns:repeat(4,1fr)}.shop-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:600px){.filters,.shop-grid{grid-template-columns:1fr}.category-grid{grid-template-columns:repeat(3,1fr);gap:7px}.category-card{padding:10px 4px}.category-name{font-size:11px}.search{flex-direction:column}.search button{width:100%}}
+header{background:white;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.header{min-height:64px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:22px;font-weight:bold;color:var(--green)}
+.hero{background:linear-gradient(120deg,#075c39,#15965b);color:white;padding:38px 0}
+.hero h1{font-size:clamp(25px,5vw,38px);margin:0 0 8px}
+.section{padding:25px 0}
+.heading{margin-bottom:14px}
+.heading h2{margin:0 0 4px;font-size:22px}
+.heading p,.muted{color:var(--muted);font-size:13px}
+.panel,.shop-card,.offer-card,.price-card{background:white;border:1px solid var(--line);border-radius:13px;padding:15px}
+.filters{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field label{display:block;font-size:13px;font-weight:bold;margin-bottom:6px}
+select,input{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;background:white;font:inherit;min-height:44px}
+button{font:inherit;cursor:pointer}
+.btn{padding:11px 17px;border-radius:8px;border:0;background:var(--green);color:white;font-weight:bold}
+.btn.alt{background:white;color:var(--green);border:1px solid var(--green)}
+.actions{display:flex;gap:9px;margin-top:13px;flex-wrap:wrap}
+.category-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:9px}
+.category-card{background:white;border:1px solid var(--line);border-radius:10px;padding:12px 5px;min-height:76px;color:var(--text)}
+.category-card.active{border:2px solid var(--green);background:var(--light);color:var(--green)}
+.category-card .emoji{display:block;font-size:23px}
+.category-card .name{font-size:11px;font-weight:bold}
+.shop-grid,.offer-grid,.price-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
+.shop-card{padding:0;overflow:hidden}
+.shop-body{padding:14px}
+.shop-card h3,.offer-card h3{margin:0 0 5px;font-size:17px}
+.tag{display:inline-block;background:var(--light);color:var(--green);border-radius:20px;padding:3px 8px;font-size:11px;margin:5px 0}
+.detail{font-size:13px;color:var(--muted);margin:6px 0;overflow-wrap:anywhere}
+.price{background:#f3f8f4;border-radius:8px;padding:9px;margin-top:9px}
+.card-actions{display:flex;gap:8px;margin-top:10px}
+.card-actions a{flex:1;text-align:center;padding:8px;border-radius:7px;text-decoration:none;font-size:12px;background:var(--light);color:var(--green)}
+.card-actions a.call{background:var(--green);color:white}
+.price-card{padding:13px}
+.price-card strong{font-size:19px;color:var(--green)}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.empty,.loading{background:white;border:1px solid var(--line);padding:22px;border-radius:12px;text-align:center;color:var(--muted);grid-column:1/-1}
+footer{background:#123c29;color:white;padding:24px 0;margin-top:30px}
+@media(max-width:850px){.category-grid{grid-template-columns:repeat(4,1fr)}.shop-grid,.offer-grid,.price-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.filters,.shop-grid,.offer-grid,.price-grid{grid-template-columns:1fr}.category-grid{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
-
 <body>
+
 <header>
- <div class="container header">
-  <div class="logo">🛍️ BezawadaDeals</div>
-  <select id="languageSelect" style="width:auto">
-   <option value="en">English</option>
-   <option value="te">తెలుగు</option>
-  </select>
- </div>
+<div class="container header">
+<div class="logo">🛍️ BezawadaDeals</div>
+<span class="muted">Vijayawada</span>
+</div>
 </header>
 
 <section class="hero">
- <div class="container">
-  <h1>Discover Local Shops in Vijayawada</h1>
-  <p>Find shops, products, prices and locations in your area.</p>
-  <div class="search">
-   <input id="searchInput" type="search" placeholder="Search shops, products or areas...">
-   <button class="primary" id="searchBtn">Search</button>
-  </div>
- </div>
+<div class="container">
+<h1>మీ ప్రాంతంలోని షాపులు, ధరలు, ఆఫర్లు</h1>
+<p>Ward ఎంచుకుని Shops, Restaurants, Shopping Malls మరియు Local Offers చూడండి.</p>
+</div>
 </section>
 
 <main class="container">
- <section class="section">
-  <div class="heading">
-   <h2>Choose Your Ward and Category</h2>
-   <p>Select a ward and category to find matching businesses.</p>
-  </div>
-  <div class="panel">
-   <div class="filters">
-    <div class="field">
-     <label for="wardSelect">Select Ward</label>
-     <select id="wardSelect">
-      <option value="">Loading wards...</option>
-     </select>
-    </div>
-    <div class="field">
-     <label for="categorySelect">Select Category</label>
-     <select id="categorySelect">
-      <option value="All">All Categories</option>
-     </select>
-    </div>
-   </div>
-   <div class="actions">
-    <button class="primary" id="applyFilters">Show Details</button>
-    <button class="secondary" id="resetFilters">Reset</button>
-   </div>
-  </div>
- </section>
 
- <section class="section">
-  <div class="heading">
-   <h2>Shop by Category</h2>
-   <p>Tap any category to select it and filter the results.</p>
-  </div>
-  <div class="category-grid" id="categoryGrid">
-   <div class="loading">Loading categories...</div>
-  </div>
- </section>
+<section class="section">
+<div class="heading">
+<h2>Ward & Category ఎంచుకోండి</h2>
+<p>86 wards మరియు అన్ని categories.</p>
+</div>
 
- <section class="section" id="shopsSection">
-  <div class="heading">
-   <h2 id="resultsTitle">Local Shops and Businesses</h2>
-   <p>Results for your selected ward and category.</p>
-  </div>
-  <div class="results">
-   <p id="resultsCount">Select a ward and category.</p>
-   <select id="sortSelect" style="width:auto">
-    <option value="name">Sort by Name</option>
-    <option value="price">Lowest Price</option>
-   </select>
-  </div>
-  <div class="shop-grid" id="shopGrid">
-   <div class="empty">Please select a ward.</div>
-  </div>
- </section>
+<div class="panel">
+<div class="filters">
+<div class="field">
+<label for="ward">Select Ward</label>
+<select id="ward"><option value="">Loading wards...</option></select>
+</div>
+<div class="field">
+<label for="category">Select Category</label>
+<select id="category"><option value="All">All Categories</option></select>
+</div>
+</div>
+<div class="actions">
+<button class="btn" id="show">Show Details</button>
+<button class="btn alt" id="reset">Reset</button>
+</div>
+</div>
+</section>
+
+<section class="section">
+<div class="heading">
+<h2>Shop by Category</h2>
+<p>Category మీద tap చేస్తే select అవుతుంది.</p>
+</div>
+<div class="category-grid" id="categories">
+<div class="loading">Loading categories...</div>
+</div>
+</section>
+
+<section class="section">
+<div class="heading">
+<h2 id="shopTitle">Local Shops</h2>
+<p>Shop details, contact number మరియు Google Maps.</p>
+</div>
+
+<div class="row" style="margin-bottom:12px">
+<span id="count" class="muted">Ward select చేయండి.</span>
+<select id="sort" style="max-width:180px">
+<option value="name">Shop Name</option>
+<option value="price">Lowest Price</option>
+</select>
+</div>
+
+<div class="shop-grid" id="shops">
+<div class="empty">Ward select చేయండి.</div>
+</div>
+</section>
+
+<section class="section">
+<div class="heading">
+<h2>Ward Offers & Discounts</h2>
+<p>Shop owners submit చేసిన active offers.</p>
+</div>
+<div class="offer-grid" id="offers">
+<div class="empty">Ward select చేసిన తర్వాత offers కనిపిస్తాయి.</div>
+</div>
+</section>
+
+<section class="section">
+<div class="heading">
+<h2>Price Comparison</h2>
+<p>Shop owner confirm చేసిన తాజా in-store prices మాత్రమే.</p>
+</div>
+
+<div class="panel">
+<div class="filters">
+<div class="field">
+<label for="product">Product Name</label>
+<input id="product" placeholder="ఉదా: Tomato, Rice, Milk">
+</div>
+<div class="field">
+<label for="unit">Unit (optional)</label>
+<input id="unit" placeholder="kg / litre / packet">
+</div>
+</div>
+<div class="actions">
+<button class="btn" id="compare">Compare Prices</button>
+</div>
+</div>
+
+<div class="price-grid" id="priceResults" style="margin-top:12px">
+<div class="empty">Ward మరియు product name ఇవ్వండి.</div>
+</div>
+</section>
+
 </main>
 
 <footer>
- <div class="container">
-  <h2>BezawadaDeals</h2>
-  <p>Vijayawada Local Shopping Marketplace</p>
-  <p>© 2026 BezawadaDeals</p>
- </div>
+<div class="container">
+<h2>BezawadaDeals</h2>
+<p>Vijayawada Local Shopping Marketplace</p>
+<small>Prices are shown only after shop-owner confirmation. Final billing price should be checked at the shop.</small>
+</div>
 </footer>
 
 <script>
 "use strict";
 
-const API = {
- wards:"/api/wards",
- categories:"/api/categories",
- shops:"/api/shops"
+const $ = id => document.getElementById(id);
+
+const icons = {
+"Vegetables":"🥦","Fruits":"🍎","Groceries":"🛒",
+"Rice & Pulses":"🌾","Dairy & Bakery":"🥛",
+"Meat & Seafood":"🐟","Supermarkets":"🏬",
+"Wholesale Stores":"📦","Shopping Malls":"🏢",
+"Department Stores":"🛍️","Restaurants":"🍽️",
+"Fast Food":"🍔","Cafes & Tea":"☕",
+"Juice & Ice Cream":"🍦","Sweets & Bakeries":"🍰",
+"Electronics":"📱","Mobile Stores":"📲",
+"Computers":"💻","Home Appliances":"🔌",
+"Fashion & Clothing":"👕","Footwear":"👟",
+"Bags":"👜","Jewellery":"💍","Accessories":"⌚",
+"Cosmetics":"💄","Medical Stores":"💊",
+"Hospitals & Clinics":"🏥","Optical Stores":"👓",
+"Petrol Bunks":"⛽","Auto Sales & Repair":"🚗",
+"Hardware":"🔧","Electrical Stores":"💡",
+"Furniture":"🪑","Home & Kitchen":"🏠",
+"Books & Stationery":"📚","Toys & Baby Products":"🧸",
+"Sports & Fitness":"⚽","Flowers":"💐","Gifts":"🎁",
+"Salons & Beauty":"💇","Laundry":"🧺",
+"Photo & Printing":"📷","Banks & ATMs":"🏦",
+"Internet & Mobile Services":"🌐",
+"Repairs & Services":"🛠️",
+"Education & Coaching":"🎓",
+"Travel & Transport":"🚌",
+"Local Services":"🧰","Pet Shops":"🐶",
+"Other Shops":"🏪"
 };
 
-let wardsData=[];
-let categoriesData=[];
-let shopsData=[];
-let selectedWard="";
-let selectedCategory="All";
-let requestNumber=0;
+let ward = "";
+let category = "All";
+let shopRows = [];
 
-const icons={
- "Vegetables":"🥦","Fruits":"🍎","Groceries":"🛒",
- "Rice & Pulses":"🌾","Dairy & Bakery":"🥛",
- "Meat & Seafood":"🐟","Supermarkets":"🏬",
- "Wholesale Stores":"📦","Shopping Malls":"🏢",
- "Department Stores":"🛍️","Restaurants":"🍽️",
- "Fast Food":"🍔","Cafes & Tea":"☕",
- "Juice & Ice Cream":"🍦","Sweets & Bakeries":"🍰",
- "Electronics":"📱","Mobile Stores":"📲",
- "Computers":"💻","Home Appliances":"🔌",
- "Fashion & Clothing":"👕","Footwear":"👟",
- "Bags":"👜","Jewellery":"💍","Accessories":"⌚",
- "Cosmetics":"💄","Medical Stores":"💊",
- "Hospitals & Clinics":"🏥","Optical Stores":"👓",
- "Petrol Bunks":"⛽","Auto Sales & Repair":"🚗",
- "Hardware":"🔧","Electrical Stores":"💡",
- "Furniture":"🪑","Home & Kitchen":"🏠",
- "Books & Stationery":"📚","Toys & Baby Products":"🧸",
- "Sports & Fitness":"⚽","Flowers":"💐","Gifts":"🎁",
- "Salons & Beauty":"💇","Laundry":"🧺",
- "Photo & Printing":"📷","Banks & ATMs":"🏦",
- "Internet & Mobile Services":"🌐",
- "Repairs & Services":"🛠️","Education & Coaching":"🎓",
- "Travel & Transport":"🚌","Local Services":"🧰",
- "Pet Shops":"🐶","Other Shops":"🏪"
-};
-
-function escapeHTML(value){
- return String(value??"").replace(/[&<>"']/g,c=>({
-  "&":"&amp;","<":"&lt;",">":"&gt;",
-  '"':"&quot;","'":"&#39;"
- })[c]);
+function esc(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&":"&amp;",
+        "<":"&lt;",
+        ">":"&gt;",
+        '"':"&quot;",
+        "'":"&#39;"
+    }[char]));
 }
 
-async function api(path){
- const response=await fetch(path,{headers:{Accept:"application/json"}});
- if(!response.ok) throw new Error("HTTP "+response.status);
- return response.json();
+async function getData(url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error("Request failed: " + response.status);
+    }
+    return response.json();
 }
 
-async function loadWards(){
- const select=document.getElementById("wardSelect");
- try{
-  const data=await api(API.wards);
-  wardsData=Array.isArray(data.wards)?data.wards:[];
-  select.innerHTML='<option value="">Select Ward</option>';
+function setCategory(value) {
+    category = value;
+    $("category").value = value;
 
-  wardsData.forEach(w=>{
-   const option=document.createElement("option");
-   option.value=w.ward_number;
-   option.textContent="Ward "+w.ward_number+" - "+(w.area_name||"Ward "+w.ward_number);
-   select.appendChild(option);
-  });
- }catch(error){
-  select.innerHTML='<option value="">Unable to load wards</option>';
-  console.error(error);
- }
+    document.querySelectorAll(".category-card").forEach(button => {
+        button.classList.toggle(
+            "active",
+            button.dataset.category === value
+        );
+    });
+
+    if (ward) {
+        loadShops();
+    }
 }
 
-function setCategory(category){
- selectedCategory=category||"All";
- document.getElementById("categorySelect").value=selectedCategory;
+async function initialize() {
+    try {
+        const [wardData, categoryData] = await Promise.all([
+            getData("/api/wards"),
+            getData("/api/categories")
+        ]);
 
- document.querySelectorAll(".category-card").forEach(button=>{
-  button.classList.toggle("active",button.dataset.category===selectedCategory);
- });
+        $("ward").innerHTML = '<option value="">Select Ward</option>';
 
- if(selectedWard){
-  loadShops();
- }else{
-  document.getElementById("shopGrid").innerHTML=
-   '<div class="empty">Category selected. Please select a ward to see matching businesses.</div>';
-  document.getElementById("resultsCount").textContent=
-   "Selected category: "+selectedCategory;
- }
+        (wardData.wards || []).forEach(item => {
+            const option = document.createElement("option");
+            option.value = item.ward_number;
+            option.textContent =
+                `Ward ${item.ward_number} - ${item.area_name}`;
+            $("ward").appendChild(option);
+        });
+
+        $("category").innerHTML =
+            '<option value="All">All Categories</option>';
+
+        $("categories").innerHTML = "";
+
+        (categoryData.categories || []).forEach(item => {
+            const option = document.createElement("option");
+            option.value = item;
+            option.textContent = item;
+            $("category").appendChild(option);
+
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "category-card";
+            button.dataset.category = item;
+
+            const emoji = document.createElement("span");
+            emoji.className = "emoji";
+            emoji.textContent = icons[item] || "🏪";
+
+            const name = document.createElement("span");
+            name.className = "name";
+            name.textContent = item;
+
+            button.appendChild(emoji);
+            button.appendChild(name);
+            button.addEventListener("click", () => setCategory(item));
+
+            $("categories").appendChild(button);
+        });
+
+        setCategory("All");
+
+    } catch (error) {
+        $("shops").innerHTML =
+            `<div class="empty">Data load కాలేదు: ${esc(error.message)}</div>`;
+    }
 }
 
-async function loadCategories(){
- const select=document.getElementById("categorySelect");
- const grid=document.getElementById("categoryGrid");
+async function loadShops() {
+    ward = $("ward").value;
 
- try{
-  const data=await api(API.categories);
-  categoriesData=Array.isArray(data.categories)?data.categories:[];
+    if (!ward) {
+        $("shops").innerHTML =
+            '<div class="empty">ముందుగా Ward select చేయండి.</div>';
+        $("offers").innerHTML =
+            '<div class="empty">Ward select చేయండి.</div>';
+        return;
+    }
 
-  select.innerHTML="";
-  grid.innerHTML="";
+    $("shops").innerHTML =
+        '<div class="loading">Loading shops...</div>';
 
-  function addCategory(category,label,emoji){
-   const option=document.createElement("option");
-   option.value=category;
-   option.textContent=label;
-   select.appendChild(option);
+    try {
+        const data = await getData(
+            `/api/shops?ward_number=${encodeURIComponent(ward)}&category=${encodeURIComponent(category)}`
+        );
 
-   const button=document.createElement("button");
-   button.type="button";
-   button.className="category-card";
-   button.dataset.category=category;
-   button.innerHTML=
-    '<span class="category-icon">'+emoji+'</span>'+
-    '<span class="category-name">'+escapeHTML(label)+'</span>';
+        shopRows = data.shops || [];
+        renderShops();
+        loadOffers();
 
-   button.addEventListener("click",()=>setCategory(category));
-   grid.appendChild(button);
-  }
-
-  addCategory("All","All Categories","🛍️");
-
-  categoriesData.forEach(category=>{
-   addCategory(category,category,icons[category]||"🏪");
-  });
-
-  setCategory("All");
- }catch(error){
-  grid.innerHTML='<div class="error">Unable to load categories. Please refresh.</div>';
-  console.error("Category API error:",error);
- }
+    } catch (error) {
+        $("shops").innerHTML =
+            `<div class="empty">Error: ${esc(error.message)}</div>`;
+    }
 }
 
-async function loadShops(){
- const grid=document.getElementById("shopGrid");
- const count=document.getElementById("resultsCount");
+function renderShops() {
+    let rows = [...shopRows];
 
- if(!selectedWard){
-  grid.innerHTML='<div class="empty">Please select a ward first.</div>';
-  count.textContent="";
-  return;
- }
+    if ($("sort").value === "price") {
+        rows.sort((a, b) => {
+            if (a.price == null) return 1;
+            if (b.price == null) return -1;
+            return Number(a.price) - Number(b.price);
+        });
+    } else {
+        rows.sort((a, b) =>
+            (a.shop_name || "").localeCompare(b.shop_name || "")
+        );
+    }
 
- const currentRequest=++requestNumber;
- grid.innerHTML='<div class="loading">Loading businesses...</div>';
+    $("count").textContent =
+        `${rows.length} shops found in Ward ${ward}`;
 
- const params=new URLSearchParams({
-  ward_number:selectedWard,
-  category:selectedCategory
- });
+    $("shopTitle").textContent =
+        `Ward ${ward} - ${category}`;
 
- try{
-  const data=await api(API.shops+"?"+params.toString());
+    if (!rows.length) {
+        $("shops").innerHTML =
+            '<div class="empty">ఈ Ward మరియు Categoryలో shop records ఇంకా databaseలో లేవు. Shop details add చేసిన తర్వాత ఇక్కడ కనిపిస్తాయి.</div>';
+        return;
+    }
 
-  if(currentRequest!==requestNumber)return;
+    $("shops").innerHTML = rows.map(shop => {
+        const address = [
+            shop.address,
+            shop.locality_name,
+            shop.area_name,
+            `Ward ${shop.ward_number}`
+        ].filter(Boolean).join(", ");
 
-  shopsData=Array.isArray(data.shops)?data.shops:[];
-  renderShops();
- }catch(error){
-  if(currentRequest!==requestNumber)return;
-  grid.innerHTML='<div class="error">Unable to load results. '+escapeHTML(error.message)+'</div>';
-  count.textContent="";
-  console.error("Shop API error:",error);
- }
+        const mapUrl =
+            shop.latitude != null && shop.longitude != null
+            ? `https://www.google.com/maps/search/?api=1&query=${shop.latitude},${shop.longitude}`
+            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((shop.shop_name || "") + " " + address + " Vijayawada")}`;
+
+        const priceHtml = shop.price != null
+            ? `<div class="price">
+                Confirmed in-store price:
+                <b>₹${esc(shop.price)}</b>
+                ${esc(shop.product_name || "")}
+                <div class="muted">
+                    Updated: ${esc(new Date(shop.updated_at).toLocaleString())}
+                </div>
+               </div>`
+            : '<div class="price muted">Confirmed price not available</div>';
+
+        return `
+        <article class="shop-card">
+            ${shop.image_url
+                ? `<img src="${esc(shop.image_url)}" alt=""
+                    style="width:100%;height:150px;object-fit:cover">`
+                : ""}
+            <div class="shop-body">
+                <h3>${esc(shop.shop_name)}</h3>
+                <span class="tag">${esc(shop.category)}</span>
+                <p class="detail">📍 ${esc(address || "Address not available")}</p>
+                ${shop.phone
+                    ? `<p class="detail">☎ ${esc(shop.phone)}</p>`
+                    : ""}
+                ${priceHtml}
+                <div class="card-actions">
+                    <a target="_blank" rel="noopener"
+                       href="${esc(mapUrl)}">Google Maps</a>
+                    ${shop.phone
+                        ? `<a class="call" href="tel:${esc(shop.phone)}">Call</a>`
+                        : ""}
+                </div>
+            </div>
+        </article>`;
+    }).join("");
 }
 
-function renderShops(){
- const grid=document.getElementById("shopGrid");
- const count=document.getElementById("resultsCount");
- const query=document.getElementById("searchInput").value.trim().toLowerCase();
- const sort=document.getElementById("sortSelect").value;
+async function loadOffers() {
+    if (!ward) return;
 
- let list=shopsData.filter(shop=>{
-  const searchable=[
-   shop.shop_name,shop.name,shop.category,
-   shop.address,shop.locality_name,shop.area_name,
-   shop.product_name,shop.phone
-  ].filter(Boolean).join(" ").toLowerCase();
+    try {
+        const data = await getData(
+            `/api/offers?ward_number=${encodeURIComponent(ward)}`
+        );
 
-  return !query||searchable.includes(query);
- });
+        const offers = data.offers || [];
 
- if(sort==="name"){
-  list.sort((a,b)=>String(a.shop_name||a.name||"").localeCompare(String(b.shop_name||b.name||"")));
- }else{
-  list.sort((a,b)=>{
-   const x=Number(a.price),y=Number(b.price);
-   if(!Number.isFinite(x))return 1;
-   if(!Number.isFinite(y))return -1;
-   return x-y;
-  });
- }
+        if (!offers.length) {
+            $("offers").innerHTML =
+                '<div class="empty">ఈ Wardలో active offers లేవు.</div>';
+            return;
+        }
 
- count.textContent=list.length+" businesses found";
+        $("offers").innerHTML = offers.map(offer => `
+            <article class="offer-card">
+                <h3>${esc(offer.title)}</h3>
+                <span class="tag">
+                    ${esc(offer.discount_text || "Offer")}
+                </span>
+                <p class="detail">
+                    ${esc(offer.shop_name)} · ${esc(offer.category)}
+                </p>
+                <p>${esc(offer.description || "")}</p>
+                <p class="muted">${esc(offer.address || "")}</p>
+                ${offer.phone
+                    ? `<a href="tel:${esc(offer.phone)}">Call Shop</a>`
+                    : ""}
+            </article>
+        `).join("");
 
- if(!list.length){
-  grid.innerHTML='<div class="empty">No businesses found in this ward and category. Try another category.</div>';
-  return;
- }
-
- grid.innerHTML="";
-
- list.forEach(shop=>{
-  const name=shop.shop_name||shop.name||"Local Business";
-  const address=[
-   shop.address,shop.locality_name,shop.area_name,
-   shop.ward_number?"Ward "+shop.ward_number:""
-  ].filter(Boolean).join(", ");
-
-  const queryAddress=[
-   name,address,"Vijayawada Andhra Pradesh"
-  ].filter(Boolean).join(", ");
-
-  const mapURL=Number.isFinite(Number(shop.latitude))&&
-   Number.isFinite(Number(shop.longitude))
-   ? "https://www.google.com/maps/search/?api=1&query="+shop.latitude+","+shop.longitude
-   : "https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(queryAddress);
-
-  const phone=String(shop.phone||"").replace(/[^\d+]/g,"");
-
-  const card=document.createElement("article");
-  card.className="shop-card";
-
-  const image=shop.image_url||shop.photo_url||"";
-  const imageHTML=image
-   ? '<div class="shop-image"><img src="'+escapeHTML(image)+'" alt="'+escapeHTML(name)+'" loading="lazy"></div>'
-   : '<div class="shop-image"><span style="font-size:45px">🏪</span></div>';
-
-  const price=shop.price!==null&&shop.price!==undefined&&shop.price!==""
-   ? '<div class="price">Latest submitted price: <strong>₹'+escapeHTML(shop.price)+'</strong>'+
-     (shop.product_name?' / '+escapeHTML(shop.product_name):'')+
-     '<small style="display:block;color:#68756d">Please verify with shop.</small></div>'
-   : '<div class="price">Price not available</div>';
-
-  card.innerHTML=
-   imageHTML+
-   '<div class="shop-content">'+
-   '<h3>'+escapeHTML(name)+'</h3>'+
-   '<span class="shop-category">'+escapeHTML(shop.category||"")+'</span>'+
-   '<p class="detail">📍 '+escapeHTML(address||"Address not available")+'</p>'+
-   (shop.phone?'<p class="detail">☎ '+escapeHTML(shop.phone)+'</p>':'')+
-   price+
-   '<div class="shop-actions">'+
-   '<a class="map-link" target="_blank" rel="noopener" href="'+escapeHTML(mapURL)+'">Google Maps</a>'+
-   (phone?'<a class="call-link" href="tel:'+escapeHTML(phone)+'">Call Shop</a>':'')+
-   '</div></div>';
-
-  grid.appendChild(card);
- });
+    } catch (error) {
+        $("offers").innerHTML =
+            '<div class="empty">Offers load కాలేదు.</div>';
+    }
 }
 
-document.getElementById("wardSelect").addEventListener("change",event=>{
- selectedWard=event.target.value;
- loadShops();
+async function comparePrices() {
+    ward = $("ward").value;
+
+    if (!ward) {
+        alert("ముందుగా Ward select చేయండి.");
+        return;
+    }
+
+    const product = $("product").value.trim();
+    const unit = $("unit").value.trim();
+
+    if (!product) {
+        alert("Product name ఇవ్వండి.");
+        return;
+    }
+
+    $("priceResults").innerHTML =
+        '<div class="loading">Comparing prices...</div>';
+
+    try {
+        let url =
+            `/api/price-comparison?ward_number=${encodeURIComponent(ward)}&product_name=${encodeURIComponent(product)}`;
+
+        if (unit) {
+            url += `&unit=${encodeURIComponent(unit)}`;
+        }
+
+        const data = await getData(url);
+        const prices = data.prices || [];
+
+        if (!prices.length) {
+            $("priceResults").innerHTML =
+                '<div class="empty">ఈ productకు ఈ Wardలో తాజా shop-owner-confirmed ధరలు లేవు.</div>';
+            return;
+        }
+
+        $("priceResults").innerHTML = prices.map((item, index) => `
+            <article class="price-card">
+                <div class="row">
+                    <b>${index + 1}. ${esc(item.shop_name)}</b>
+                    <strong>₹${esc(item.price)}</strong>
+                </div>
+                <p class="detail">
+                    ${esc(item.product_name)} / ${esc(item.unit)}
+                </p>
+                <p class="detail">${esc(item.address || "")}</p>
+                <p class="muted">
+                    Confirmed: ${esc(new Date(item.updated_at).toLocaleString())}
+                </p>
+                ${item.phone
+                    ? `<a href="tel:${esc(item.phone)}">Call Shop</a>`
+                    : ""}
+            </article>
+        `).join("");
+
+    } catch (error) {
+        $("priceResults").innerHTML =
+            `<div class="empty">Comparison error: ${esc(error.message)}</div>`;
+    }
+}
+
+$("ward").addEventListener("change", () => {
+    ward = $("ward").value;
+    loadShops();
 });
 
-document.getElementById("categorySelect").addEventListener("change",event=>{
- setCategory(event.target.value);
+$("category").addEventListener("change", event => {
+    setCategory(event.target.value);
 });
 
-document.getElementById("applyFilters").addEventListener("click",()=>{
- selectedWard=document.getElementById("wardSelect").value;
- selectedCategory=document.getElementById("categorySelect").value||"All";
- loadShops();
+$("show").addEventListener("click", () => {
+    ward = $("ward").value;
+    category = $("category").value || "All";
+    loadShops();
 });
 
-document.getElementById("resetFilters").addEventListener("click",()=>{
- document.getElementById("wardSelect").value="";
- document.getElementById("searchInput").value="";
- selectedWard="";
- setCategory("All");
- shopsData=[];
- document.getElementById("shopGrid").innerHTML='<div class="empty">Please select a ward.</div>';
- document.getElementById("resultsCount").textContent="";
+$("reset").addEventListener("click", () => {
+    ward = "";
+    category = "All";
+    shopRows = [];
+
+    $("ward").value = "";
+    $("category").value = "All";
+
+    $("shops").innerHTML =
+        '<div class="empty">Ward select చేయండి.</div>';
+
+    $("offers").innerHTML =
+        '<div class="empty">Ward select చేసిన తర్వాత offers కనిపిస్తాయి.</div>';
+
+    $("priceResults").innerHTML =
+        '<div class="empty">Ward మరియు product name ఇవ్వండి.</div>';
+
+    setCategory("All");
 });
 
-document.getElementById("searchBtn").addEventListener("click",()=>{
- if(!selectedWard){
-  alert("Please select a ward first.");
-  return;
- }
- renderShops();
-});
+$("sort").addEventListener("change", renderShops);
+$("compare").addEventListener("click", comparePrices);
 
-document.getElementById("searchInput").addEventListener("keydown",event=>{
- if(event.key==="Enter"){
-  event.preventDefault();
-  document.getElementById("searchBtn").click();
- }
-});
-
-document.getElementById("sortSelect").addEventListener("change",renderShops);
-
-document.addEventListener("DOMContentLoaded",async()=>{
- await Promise.all([loadWards(),loadCategories()]);
-});
+initialize();
 </script>
+
 </body>
 </html>
