@@ -1,314 +1,442 @@
 import os
 import re
-import json
 import time
+import logging
 from datetime import date, timedelta
-from typing import Optional
+from typing import Any
 
 import httpx
 from fastapi import APIRouter, Query
 
 router = APIRouter()
+logger = logging.getLogger("bezawadadeals.market_prices")
 
-BASE_URL = "https://api.ceda.ashoka.edu.in/agmarknet"
-
+# CEDA public Agmarknet data API
+BASE_URL = "https://agmarknet.ceda.ashoka.edu.in/api"
 STATE_ID = 28  # Andhra Pradesh
 
-CACHE = {}
-CACHE_SECONDS = 1800
-
-# Supported agricultural commodities.
-COMMODITIES = {
-    "Tomato": ["tomato"],
-    "Onion": ["onion"],
-    "Potato": ["potato"],
-    "Brinjal": ["brinjal", "eggplant"],
-    "Cabbage": ["cabbage"],
-    "Cauliflower": ["cauliflower"],
-    "Carrot": ["carrot"],
-    "Green Chilli": ["green chilli", "chilli"],
-    "Banana": ["banana"],
-    "Mango": ["mango"],
-    "Apple": ["apple"],
-    "Grapes": ["grapes"],
-    "Orange": ["orange"],
-    "Papaya": ["papaya"],
-    "Rice": ["rice"],
-    "Wheat": ["wheat"],
-    "Maize": ["maize"],
-    "Groundnut": ["groundnut"],
-    "Turmeric": ["turmeric"],
-    "Cotton": ["cotton"],
+CACHE_SECONDS = 30 * 60
+_cache: dict[str, Any] = {
+    "expires": 0,
+    "data": None
 }
 
 CATEGORY_PRODUCTS = {
     "Vegetables": [
-        "Tomato", "Onion", "Potato", "Brinjal", "Cabbage",
-        "Cauliflower", "Carrot", "Green Chilli"
+        "Tomato", "Onion", "Potato", "Brinjal",
+        "Cabbage", "Cauliflower", "Carrot",
+        "Green Chilli", "Drumstick", "Ladies Finger"
     ],
     "Fruits": [
-        "Banana", "Mango", "Apple", "Grapes", "Orange", "Papaya"
+        "Banana", "Mango", "Apple", "Grapes",
+        "Orange", "Papaya", "Guava", "Pomegranate"
     ],
-    "Rice & Pulses": ["Rice", "Wheat"],
+    "Rice & Pulses": [
+        "Rice", "Wheat", "Maize", "Bengal Gram",
+        "Black Gram", "Green Gram", "Red Gram"
+    ],
     "Groceries": [
-        "Rice", "Wheat", "Maize", "Groundnut", "Turmeric"
-    ],
+        "Turmeric", "Groundnut", "Chilli",
+        "Coriander", "Cotton"
+    ]
 }
 
-def clean_name(value):
-    return re.sub(r"\s+", " ", str(value or "")).strip().casefold()
+ALIASES = {
+    "tomatoes": "Tomato",
+    "onions": "Onion",
+    "potatoes": "Potato",
+    "brinjals": "Brinjal",
+    "banana": "Banana",
+    "green chilli": "Green Chilli",
+    "chillies": "Chilli",
+    "red chilli": "Chilli",
+    "ground nut": "Groundnut",
+    "paddy": "Rice",
+    "arhar": "Red Gram",
+    "tur": "Red Gram",
+    "moong": "Green Gram",
+    "urad": "Black Gram",
+    "chana": "Bengal Gram"
+}
 
 
-def find_rows(obj):
-    """Find record arrays in different API response structures."""
-    if isinstance(obj, list):
-        return obj
-
-    if isinstance(obj, dict):
-        for key in ("data", "records", "results", "prices", "rows"):
-            value = obj.get(key)
-            if isinstance(value, list):
-                return value
-            if isinstance(value, dict):
-                found = find_rows(value)
-                if found:
-                    return found
-
-        for value in obj.values():
-            if isinstance(value, (dict, list)):
-                found = find_rows(value)
-                if found:
-                    return found
-
-    return []
+def clean_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return re.sub(r"\s+", " ", str(value)).strip()
 
 
-async def get_commodities(client):
-    response = await client.get(
-        f"{BASE_URL}/commodities",
-        timeout=25
-    )
-    response.raise_for_status()
-    return response.json()
+def normalize_name(value: str) -> str:
+    name = clean_text(value).casefold()
+    return ALIASES.get(name, name).casefold()
 
 
-async def get_commodity_id(client, product_name):
-    data = await get_commodities(client)
-    rows = find_rows(data)
+def find_value(row: dict, *keys):
+    lowered = {
+        str(key).casefold(): value
+        for key, value in row.items()
+    }
 
-    wanted = clean_name(product_name)
-
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-
-        name = clean_name(
-            row.get("commodity")
-            or row.get("commodity_name")
-            or row.get("name")
-            or row.get("display_name")
-        )
-
-        if name == wanted:
-            return (
-                row.get("commodity_id")
-                or row.get("id")
-                or row.get("commodityId")
-            )
+    for key in keys:
+        value = lowered.get(key.casefold())
+        if value not in (None, ""):
+            return value
 
     return None
 
 
-def normalize_price_rows(payload, product_name):
-    rows = find_rows(payload)
-    output = []
+def as_number(value):
+    if value is None:
+        return None
+
+    try:
+        cleaned = str(value).replace(",", "").strip()
+        if cleaned in ("", "-", "NR", "NA", "N/A"):
+            return None
+        return float(cleaned)
+    except (TypeError, ValueError):
+        return None
+
+
+def extract_rows(payload):
+    if isinstance(payload, list):
+        return payload
+
+    if isinstance(payload, dict):
+        for key in ("data", "prices", "results", "records", "items"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return value
+
+            if isinstance(value, dict):
+                nested = extract_rows(value)
+                if nested:
+                    return nested
+
+    return []
+
+
+async def api_get(client: httpx.AsyncClient, path: str):
+    response = await client.get(f"{BASE_URL}{path}")
+    response.raise_for_status()
+    return response.json()
+
+
+async def get_commodities(client):
+    payload = await api_get(client, "/commodities")
+    rows = extract_rows(payload)
+
+    result = {}
 
     for row in rows:
         if not isinstance(row, dict):
             continue
 
-        market = (
-            row.get("market")
-            or row.get("market_name")
-            or row.get("Market")
-            or row.get("mandi")
+        name = find_value(
+            row, "commodity", "commodity_name",
+            "name", "commodityName"
+        )
+        commodity_id = find_value(
+            row, "commodity_id", "id", "commodityId"
         )
 
-        district = (
-            row.get("district")
-            or row.get("district_name")
-            or row.get("District")
-        )
+        if name and commodity_id is not None:
+            result[normalize_name(name)] = {
+                "id": commodity_id,
+                "name": clean_text(name)
+            }
 
-        modal = (
-            row.get("modal_price")
-            or row.get("modal")
-            or row.get("Modal Price")
-            or row.get("modalPrice")
-        )
+    return result
 
-        minimum = (
-            row.get("min_price")
-            or row.get("minimum_price")
-            or row.get("Min Price")
-        )
 
-        maximum = (
-            row.get("max_price")
-            or row.get("maximum_price")
-            or row.get("Max Price")
-        )
+def resolve_commodity(name: str, commodities: dict):
+    target = normalize_name(name)
 
-        reported_date = (
-            row.get("arrival_date")
-            or row.get("price_date")
-            or row.get("date")
-            or row.get("reported_date")
-        )
+    if target in commodities:
+        return commodities[target]
 
-        try:
-            modal = float(str(modal).replace(",", ""))
-        except (ValueError, TypeError):
+    for key, value in commodities.items():
+        if target == key or target in key or key in target:
+            return value
+
+    return None
+
+
+def normalize_price_row(row: dict, requested_product: str):
+    market = find_value(
+        row, "market", "market_name", "marketName",
+        "market_name_en", "marketname"
+    )
+    district = find_value(
+        row, "district", "district_name", "districtName"
+    )
+    state = find_value(
+        row, "state", "state_name", "stateName"
+    )
+    commodity = find_value(
+        row, "commodity", "commodity_name",
+        "commodityName", "name"
+    )
+    variety = find_value(row, "variety", "variety_name")
+
+    minimum = as_number(find_value(
+        row, "min_price", "minprice", "minimum_price", "min"
+    ))
+    maximum = as_number(find_value(
+        row, "max_price", "maxprice", "maximum_price", "max"
+    ))
+    modal = as_number(find_value(
+        row, "modal_price", "modalprice", "modal"
+    ))
+
+    reported_date = find_value(
+        row, "arrival_date", "price_date", "date",
+        "reported_date", "reportedDate"
+    )
+
+    # Do not invent a market name or a price.
+    if modal is None:
+        return None
+
+    return {
+        "product_name": clean_text(commodity) or requested_product,
+        "requested_product": requested_product,
+        "variety": clean_text(variety) or None,
+        "market_name": clean_text(market) or "Market name not supplied",
+        "district": clean_text(district) or "District not supplied",
+        "state": clean_text(state) or "Andhra Pradesh",
+        "min_price": minimum,
+        "max_price": maximum,
+        "modal_price": modal,
+        "price": modal,
+        "unit": "₹ / quintal",
+        "reported_date": clean_text(reported_date) or None,
+        "source": "AGMARKNET via CEDA",
+        "source_type": "government_mandi_wholesale",
+        "price_label": "Wholesale market reference price",
+        "is_shop_retail": False
+    }
+
+
+async def fetch_product_prices(
+    client: httpx.AsyncClient,
+    commodities: dict,
+    product_name: str,
+    start_date: str,
+    end_date: str
+):
+    commodity = resolve_commodity(product_name, commodities)
+
+    if not commodity:
+        return []
+
+    payload = {
+        "state_id": STATE_ID,
+        "commodity_id": commodity["id"],
+        "district_id": 0,
+        "calculation_type": "d",
+        "chart_type": "datadownload",
+        "start_date": f"{start_date}T00:00:00Z",
+        "end_date": f"{end_date}T23:59:59Z"
+    }
+
+    response = await client.post(
+        f"{BASE_URL}/prices",
+        json=payload
+    )
+    response.raise_for_status()
+
+    raw_rows = extract_rows(response.json())
+    output = []
+
+    for row in raw_rows:
+        if not isinstance(row, dict):
             continue
 
-        if modal <= 0:
-            continue
-
-        try:
-            minimum = float(str(minimum).replace(",", ""))
-        except (ValueError, TypeError):
-            minimum = None
-
-        try:
-            maximum = float(str(maximum).replace(",", ""))
-        except (ValueError, TypeError):
-            maximum = None
-
-        output.append({
-            "product_name": product_name,
-            "market_name": str(market or "Market not specified"),
-            "district": str(district or ""),
-            "min_price_per_quintal": minimum,
-            "max_price_per_quintal": maximum,
-            "modal_price_per_quintal": modal,
-            "unit": "quintal",
-            "reported_date": str(reported_date or ""),
-            "source": "AGMARKNET / CEDA",
-            "source_type": "government_mandi_wholesale"
-        })
+        item = normalize_price_row(row, product_name)
+        if item:
+            output.append(item)
 
     return output
 
 
-async def fetch_product_price(product_name):
-    cache_key = clean_name(product_name)
+async def fetch_market_prices(category: str, product_name: str = ""):
     now = time.time()
+    cache_key = f"{category.casefold()}::{product_name.casefold()}"
 
-    cached = CACHE.get(cache_key)
-    if cached and now - cached["time"] < CACHE_SECONDS:
-        return cached["data"]
+    if (
+        _cache["data"] is not None
+        and _cache["expires"] > now
+        and _cache.get("key") == cache_key
+    ):
+        return _cache["data"]
 
-    async with httpx.AsyncClient(
-        headers={"Accept": "application/json"},
-        follow_redirects=True
-    ) as client:
-
-        commodity_id = await get_commodity_id(client, product_name)
-
-        if not commodity_id:
-            return []
-
-        end_date = date.today()
-        start_date = end_date - timedelta(days=7)
-
-        payload = {
-            "state_id": STATE_ID,
-            "commodity_id": int(commodity_id),
-            "district_id": 0,
-            "calculation_type": "d",
-            "chart_type": "datadownload",
-            "start_date": start_date.isoformat() + "T00:00:00Z",
-            "end_date": end_date.isoformat() + "T23:59:59Z"
-        }
-
-        response = await client.post(
-            f"{BASE_URL}/prices",
-            json=payload,
-            timeout=45
-        )
-        response.raise_for_status()
-
-        result = normalize_price_rows(
-            response.json(),
-            product_name
-        )
-
-        CACHE[cache_key] = {
-            "time": now,
-            "data": result
-        }
-
-        return result
-
-
-@router.get("/api/market-prices")
-async def market_prices(
-    ward_number: int = Query(..., ge=1, le=86),
-    category: str = Query(...),
-    product_name: Optional[str] = None
-):
-    category = category.strip()
+    products = CATEGORY_PRODUCTS.get(category, [])
 
     if product_name:
-        selected = [
-            name for name in COMMODITIES
-            if clean_name(name) == clean_name(product_name)
+        products = [
+            product for product in products
+            if normalize_name(product) == normalize_name(product_name)
+            or normalize_name(product_name) in normalize_name(product)
         ]
-    else:
-        selected = CATEGORY_PRODUCTS.get(category, [])
 
-    if not selected:
+        # Permit a commodity search if it is in the configured categories.
+        if not products:
+            products = [
+                product_name.strip()
+            ]
+
+    if not products:
         return {
             "success": True,
-            "ward_number": ward_number,
+            "source": "AGMARKNET via CEDA",
+            "scope": "Andhra Pradesh state-level mandi data",
             "category": category,
-            "price_type": "government_mandi_wholesale",
-            "total": 0,
             "prices": [],
-            "message": "No supported government market price feed for this category."
+            "message": (
+                "ఈ categoryకి AGMARKNET agricultural commodity "
+                "data mapping లేదు."
+            )
         }
+
+    end = date.today()
+    start = end - timedelta(days=10)
+
+    headers = {
+        "User-Agent": "BezawadaDeals/1.0 price-information",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Origin": "https://agmarknet.ceda.ashoka.edu.in",
+        "Referer": "https://agmarknet.ceda.ashoka.edu.in/"
+    }
+
+    timeout = httpx.Timeout(25.0, connect=10.0)
 
     all_prices = []
     errors = []
 
-    for name in selected:
+    async with httpx.AsyncClient(
+        headers=headers,
+        timeout=timeout,
+        follow_redirects=True
+    ) as client:
         try:
-            rows = await fetch_product_price(name)
-            all_prices.extend(rows)
-        except Exception as exc:
-            errors.append({
-                "product": name,
-                "error": str(exc)[:250]
-            })
+            commodities = await get_commodities(client)
+        except Exception as error:
+            logger.exception("Could not load CEDA commodities")
+            return {
+                "success": False,
+                "source": "AGMARKNET via CEDA",
+                "scope": "Andhra Pradesh state-level mandi data",
+                "category": category,
+                "prices": [],
+                "message": "Commodity list fetch కాలేదు.",
+                "error": str(error)[:250]
+            }
 
+        for product in products:
+            try:
+                rows = await fetch_product_prices(
+                    client,
+                    commodities,
+                    product,
+                    start.isoformat(),
+                    end.isoformat()
+                )
+                all_prices.extend(rows)
+            except Exception as error:
+                logger.warning(
+                    "Price fetch failed for %s: %s",
+                    product,
+                    error
+                )
+                errors.append(product)
+
+    # Newest reported observations first when date is available.
     all_prices.sort(
-        key=lambda item: (
-            item.get("reported_date", ""),
-            item.get("product_name", ""),
-            item.get("market_name", "")
-        ),
+        key=lambda item: item.get("reported_date") or "",
         reverse=True
     )
 
-    return {
+    result = {
         "success": True,
-        "ward_number": ward_number,
+        "source": "AGMARKNET via CEDA",
+        "scope": (
+            "Andhra Pradesh state-level mandi data. "
+            "Not a Vijayawada ward-level or shop-retail quote."
+        ),
         "category": category,
-        "coverage": "Andhra Pradesh market reference; not ward-specific",
-        "price_type": "government_mandi_wholesale",
+        "requested_product": product_name or None,
+        "date_range": {
+            "from": start.isoformat(),
+            "to": end.isoformat()
+        },
         "total": len(all_prices),
         "prices": all_prices,
-        "errors": errors,
-        "source": "AGMARKNET / CEDA",
-        "checked_at": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
+        "failed_products": errors,
+        "message": (
+            "ధరలు మార్కెట్ wholesale సమాచారం మాత్రమే. "
+            "దుకాణ retail ధరలుగా పరిగణించవద్దు."
+        )
+    }
+
+    _cache.update({
+        "key": cache_key,
+        "expires": now + CACHE_SECONDS,
+        "data": result
+    })
+
+    return result
+
+
+@router.get("/api/market-prices")
+async def market_prices(
+    ward_number: int = Query(ge=1, le=86),
+    category: str = Query(min_length=2),
+    product_name: str = Query(default="")
+):
+    category = category.strip()
+
+    if category not in CATEGORY_PRODUCTS:
+        return {
+            "success": True,
+            "category": category,
+            "scope": "No matching public agricultural feed",
+            "prices": [],
+            "message": (
+                "ఈ categoryకి ప్రస్తుతం కనెక్ట్ చేసిన "
+                "ప్రభుత్వ మార్కెట్ ధరల feed లేదు."
+            )
+        }
+
+    result = await fetch_market_prices(
+        category,
+        product_name.strip()
+    )
+
+    # Ward number is retained for the website filter, but the
+    # external feed is state-level and is not falsely ward-mapped.
+    result["selected_ward"] = ward_number
+    result["ward_specific"] = False
+
+    return result
+
+
+@router.get("/api/market-feed-status")
+async def market_feed_status():
+    return {
+        "success": True,
+        "feed": "AGMARKNET via CEDA",
+        "state": "Andhra Pradesh",
+        "state_id": STATE_ID,
+        "supported_categories": list(CATEGORY_PRODUCTS.keys()),
+        "cache_minutes": CACHE_SECONDS // 60,
+        "scope": "State-level mandi wholesale prices",
+        "not_supported": [
+            "Ward-level shop retail prices",
+            "All supermarket live prices",
+            "Mall store prices",
+            "Mall offers without official feeds",
+            "Restaurants and other non-agricultural categories"
+        ]
     }
