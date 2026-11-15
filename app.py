@@ -24,18 +24,22 @@ from pydantic import BaseModel, Field
 # BEZAWADADEALS CONFIGURATION
 # ==========================================================
 
-APP_VERSION = "8.0.0"
+APP_VERSION = "9.0.0"
 TOTAL_WARDS = 86
 MAX_IMPORT_SHOPS = 1000
 
 DATA_GOV_RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
 DATA_GOV_API_URL = (
-    "https://api.data.gov.in/resource/"
-    + DATA_GOV_RESOURCE_ID
+    "https://api.data.gov.in/resource/" + DATA_GOV_RESOURCE_ID
 )
-
 AGMARKNET_SOURCE = "Government of India - AGMARKNET"
 
+# Only these source types are allowed for official feed imports.
+OFFICIAL_SOURCE_TYPES = {
+    "government",
+    "official_retailer",
+    "official_market"
+}
 
 WARD_AREA_NAMES = {
     1: "Ramavarappadu / Inner Ring Road",
@@ -106,7 +110,6 @@ WARD_AREA_NAMES = {
     86: "Kandrika Junction / Pathapadu"
 }
 
-
 CATEGORIES = [
     "Vegetables", "Fruits", "Groceries", "Rice & Pulses",
     "Dairy & Bakery", "Meat & Seafood", "Supermarkets",
@@ -127,16 +130,16 @@ CATEGORIES = [
     "Other Shops"
 ]
 
-CATEGORY_LOOKUP = {item.casefold(): item for item in CATEGORIES}
+CATEGORY_LOOKUP = {x.casefold(): x for x in CATEGORIES}
 
 
 # ==========================================================
-# FASTAPI APPLICATION
+# APPLICATION
 # ==========================================================
 
 app = FastAPI(
     title="BezawadaDeals",
-    description="Vijayawada Local Shopping Marketplace",
+    description="Vijayawada Local Shopping and Price Tracker",
     version=APP_VERSION
 )
 
@@ -155,27 +158,27 @@ if PUBLIC_DIR.is_dir():
 
 
 # ==========================================================
-# DATABASE CONNECTION
+# COMMON HELPERS
 # ==========================================================
+
+def now_utc():
+    return datetime.now(timezone.utc)
+
 
 def get_database_url():
     url = os.getenv("DATABASE_URL")
-
     if url and url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
-
     return url
 
 
 def get_connection():
     url = get_database_url()
-
     if not url:
         raise HTTPException(
             status_code=503,
             detail="DATABASE_URL is not configured"
         )
-
     return psycopg.connect(
         url,
         connect_timeout=10,
@@ -184,37 +187,46 @@ def get_connection():
 
 
 def canonical_category(value):
-    result = CATEGORY_LOOKUP.get(
-        (value or "").strip().casefold()
-    )
-
+    result = CATEGORY_LOOKUP.get((value or "").strip().casefold())
     if not result:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid category: {value}"
         )
-
     return result
 
 
 def check_admin_key(api_key):
     expected = os.getenv("PRICE_FEED_API_KEY")
-
     if not expected or not api_key:
-        raise HTTPException(
-            status_code=401,
-            detail="Missing API key"
-        )
-
+        raise HTTPException(status_code=401, detail="Missing API key")
     if not secrets.compare_digest(expected, api_key):
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid API key"
-        )
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+
+def price_status(in_store_confirmed, valid_until):
+    """Never describe an expired price as current."""
+    if valid_until is not None and valid_until <= now_utc():
+        return "Expired"
+    if in_store_confirmed:
+        return "Verified"
+    return "Estimated"
+
+
+def price_status_description(source_type):
+    if source_type == "shop_owner_confirmed":
+        return "Shop owner confirmed; not a government feed"
+    if source_type == "government":
+        return "Government source"
+    if source_type == "official_retailer":
+        return "Official retailer source"
+    if source_type == "official_market":
+        return "Official market source"
+    return "Source not independently verified"
 
 
 # ==========================================================
-# DATABASE TABLE CREATION
+# DATABASE TABLES AND MIGRATIONS
 # ==========================================================
 
 def create_database_tables():
@@ -326,6 +338,10 @@ def create_database_tables():
         ON prices(shop_id, product_id, updated_at DESC)
         """,
         """
+        CREATE INDEX IF NOT EXISTS idx_prices_valid_until
+        ON prices(valid_until)
+        """,
+        """
         CREATE INDEX IF NOT EXISTS idx_offers_shop
         ON offers(shop_id, is_active)
         """
@@ -339,15 +355,11 @@ def create_database_tables():
 
                 for ward_no in range(1, TOTAL_WARDS + 1):
                     area = WARD_AREA_NAMES.get(
-                        ward_no,
-                        f"Ward {ward_no}"
+                        ward_no, f"Ward {ward_no}"
                     )
-
                     cursor.execute(
                         """
-                        INSERT INTO wards(
-                            ward_number, area_name, is_active
-                        )
+                        INSERT INTO wards(ward_number, area_name, is_active)
                         VALUES(%s, %s, TRUE)
                         ON CONFLICT(ward_number)
                         DO UPDATE SET
@@ -363,7 +375,6 @@ def create_database_tables():
                         """,
                         (ward_no, area)
                     )
-
             connection.commit()
 
         print("BezawadaDeals database setup completed")
@@ -391,7 +402,6 @@ async def home(request: Request):
             "<h2>templates/index.html not found</h2>",
             status_code=500
         )
-
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -415,7 +425,9 @@ async def api_status():
         "version": APP_VERSION,
         "categories": CATEGORIES,
         "total_categories": len(CATEGORIES),
-        "total_wards": TOTAL_WARDS
+        "total_wards": TOTAL_WARDS,
+        "price_statuses": ["Verified", "Estimated", "Expired"],
+        "price_sort": ["low_to_high", "high_to_low"]
     }
 
 
@@ -430,18 +442,12 @@ async def database_status():
                     WHERE table_schema='public'
                     ORDER BY table_name
                 """)
-
-                tables = [
-                    row["table_name"]
-                    for row in cursor.fetchall()
-                ]
-
+                tables = [r["table_name"] for r in cursor.fetchall()]
         return {
             "success": True,
             "database": "connected",
             "tables": tables
         }
-
     except Exception as error:
         return {
             "success": False,
@@ -454,9 +460,7 @@ async def database_status():
 async def check_files():
     return {
         "templates_folder": str(TEMPLATE_DIR),
-        "index_html_exists": (
-            TEMPLATE_DIR / "index.html"
-        ).is_file(),
+        "index_html_exists": (TEMPLATE_DIR / "index.html").is_file(),
         "public_folder_exists": PUBLIC_DIR.is_dir()
     }
 
@@ -484,9 +488,7 @@ async def get_wards():
                 WHERE is_active=TRUE
                 ORDER BY ward_number
             """)
-
             rows = cursor.fetchall()
-
     return {
         "success": True,
         "total_wards": len(rows),
@@ -511,32 +513,22 @@ async def add_locality(
     x_api_key: Optional[str] = Header(default=None)
 ):
     check_admin_key(x_api_key)
-
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
-                """
-                SELECT id FROM wards
-                WHERE ward_number=%s AND is_active=TRUE
-                """,
+                "SELECT id FROM wards WHERE ward_number=%s AND is_active=TRUE",
                 (data.ward_number,)
             )
-
             ward = cursor.fetchone()
-
             if not ward:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Ward not found"
-                )
+                raise HTTPException(status_code=404, detail="Ward not found")
 
             cursor.execute(
                 """
                 INSERT INTO localities(
-                    ward_id, locality_name,
-                    locality_name_te, is_verified
+                    ward_id, locality_name, locality_name_te, is_verified
                 )
-                VALUES(%s, %s, %s, %s)
+                VALUES(%s,%s,%s,%s)
                 ON CONFLICT(ward_id, locality_name)
                 DO UPDATE SET
                     locality_name_te=EXCLUDED.locality_name_te,
@@ -544,25 +536,17 @@ async def add_locality(
                 RETURNING id, locality_name
                 """,
                 (
-                    ward["id"],
-                    data.locality_name.strip(),
-                    data.locality_name_te,
-                    data.is_verified
+                    ward["id"], data.locality_name.strip(),
+                    data.locality_name_te, data.is_verified
                 )
             )
-
             result = cursor.fetchone()
-
         connection.commit()
-
-    return {
-        "success": True,
-        "locality": result
-    }
+    return {"success": True, "locality": result}
 
 
 # ==========================================================
-# SHOP INPUT AND SHOP CREATION
+# SHOP CREATION AND BULK IMPORT
 # ==========================================================
 
 class ShopInput(BaseModel):
@@ -581,23 +565,19 @@ class ShopInput(BaseModel):
 def get_or_create_locality(cursor, ward_id, locality_name):
     if not locality_name:
         return None
-
     name = locality_name.strip()
-
     if len(name) < 2:
         return None
-
     cursor.execute(
         """
         INSERT INTO localities(ward_id, locality_name)
-        VALUES(%s, %s)
+        VALUES(%s,%s)
         ON CONFLICT(ward_id, locality_name)
         DO UPDATE SET locality_name=EXCLUDED.locality_name
         RETURNING id
         """,
         (ward_id, name)
     )
-
     return cursor.fetchone()["id"]
 
 
@@ -612,64 +592,35 @@ async def add_shop(
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
-                """
-                SELECT id FROM wards
-                WHERE ward_number=%s AND is_active=TRUE
-                """,
+                "SELECT id FROM wards WHERE ward_number=%s AND is_active=TRUE",
                 (data.ward_number,)
             )
-
             ward = cursor.fetchone()
-
             if not ward:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Ward not found"
-                )
+                raise HTTPException(status_code=404, detail="Ward not found")
 
             locality_id = get_or_create_locality(
-                cursor,
-                ward["id"],
-                data.locality_name
+                cursor, ward["id"], data.locality_name
             )
-
             cursor.execute(
                 """
                 INSERT INTO shops(
-                    shop_name, category, ward_id, address,
-                    phone, owner_name, locality_id,
-                    latitude, longitude, image_url
+                    shop_name, category, ward_id, address, phone,
+                    owner_name, locality_id, latitude, longitude, image_url
                 )
                 VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 RETURNING id, shop_name, category
                 """,
                 (
-                    data.shop_name.strip(),
-                    category,
-                    ward["id"],
-                    data.address,
-                    data.phone,
-                    data.owner_name,
-                    locality_id,
-                    data.latitude,
-                    data.longitude,
-                    data.image_url
+                    data.shop_name.strip(), category, ward["id"],
+                    data.address, data.phone, data.owner_name, locality_id,
+                    data.latitude, data.longitude, data.image_url
                 )
             )
-
             shop = cursor.fetchone()
-
         connection.commit()
+    return {"success": True, "shop": shop}
 
-    return {
-        "success": True,
-        "shop": shop
-    }
-
-
-# ==========================================================
-# BULK SHOP IMPORT
-# ==========================================================
 
 class BulkShopRow(BaseModel):
     shop_name: str = Field(min_length=2, max_length=180)
@@ -686,8 +637,7 @@ class BulkShopRow(BaseModel):
 
 class BulkShopImport(BaseModel):
     shops: list[BulkShopRow] = Field(
-        min_length=1,
-        max_length=MAX_IMPORT_SHOPS
+        min_length=1, max_length=MAX_IMPORT_SHOPS
     )
 
 
@@ -697,39 +647,30 @@ async def import_shops(
     x_api_key: Optional[str] = Header(default=None)
 ):
     check_admin_key(x_api_key)
-
     inserted = 0
     skipped = 0
-    seen_in_request = set()
+    seen = set()
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
             for item in data.shops:
                 shop_name = item.shop_name.strip()
                 category = canonical_category(item.category)
-
-                duplicate_key = (
+                key = (
                     item.ward_number,
                     shop_name.casefold(),
                     category.casefold()
                 )
-
-                if duplicate_key in seen_in_request:
+                if key in seen:
                     skipped += 1
                     continue
-
-                seen_in_request.add(duplicate_key)
+                seen.add(key)
 
                 cursor.execute(
-                    """
-                    SELECT id FROM wards
-                    WHERE ward_number=%s AND is_active=TRUE
-                    """,
+                    "SELECT id FROM wards WHERE ward_number=%s AND is_active=TRUE",
                     (item.ward_number,)
                 )
-
                 ward = cursor.fetchone()
-
                 if not ward:
                     raise HTTPException(
                         status_code=400,
@@ -746,61 +687,41 @@ async def import_shops(
                     """,
                     (ward["id"], shop_name, category)
                 )
-
                 if cursor.fetchone():
                     skipped += 1
                     continue
 
                 locality_id = get_or_create_locality(
-                    cursor,
-                    ward["id"],
-                    item.locality_name
+                    cursor, ward["id"], item.locality_name
                 )
-
                 cursor.execute(
                     """
                     INSERT INTO shops(
-                        shop_name, category, ward_id, address,
-                        phone, owner_name, locality_id,
-                        latitude, longitude, image_url,
-                        is_verified, data_connection_status
+                        shop_name, category, ward_id, address, phone,
+                        owner_name, locality_id, latitude, longitude,
+                        image_url, is_verified, data_connection_status
                     )
-                    VALUES(
-                        %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                        FALSE,'not_connected'
-                    )
-                    RETURNING id
+                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,FALSE,'not_connected')
                     """,
                     (
-                        shop_name,
-                        category,
-                        ward["id"],
-                        item.address,
-                        item.phone,
-                        item.owner_name,
-                        locality_id,
-                        item.latitude,
-                        item.longitude,
-                        item.image_url
+                        shop_name, category, ward["id"], item.address,
+                        item.phone, item.owner_name, locality_id,
+                        item.latitude, item.longitude, item.image_url
                     )
                 )
-
-                cursor.fetchone()
                 inserted += 1
-
         connection.commit()
 
     return {
         "success": True,
         "received": len(data.shops),
         "inserted": inserted,
-        "skipped_duplicates": skipped,
-        "message": "Shop import completed"
+        "skipped_duplicates": skipped
     }
 
 
 # ==========================================================
-# SHOP OWNER UPDATE TOKEN
+# SHOP OWNER TOKEN
 # ==========================================================
 
 @app.post("/api/admin/shops/{shop_id}/create-update-token")
@@ -815,22 +736,15 @@ async def create_shop_update_token(
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                UPDATE shops
-                SET shop_update_token=%s
+                UPDATE shops SET shop_update_token=%s
                 WHERE id=%s
                 RETURNING id, shop_name
                 """,
                 (token, shop_id)
             )
-
             shop = cursor.fetchone()
-
             if not shop:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Shop not found"
-                )
-
+                raise HTTPException(status_code=404, detail="Shop not found")
         connection.commit()
 
     return {
@@ -859,15 +773,10 @@ async def shop_owner_price_update(
     x_shop_token: Optional[str] = Header(default=None)
 ):
     if not x_shop_token:
-        raise HTTPException(
-            status_code=401,
-            detail="Missing X-Shop-Token"
-        )
-
+        raise HTTPException(status_code=401, detail="Missing X-Shop-Token")
     if data.confirm_same_as_shop_price is not True:
         raise HTTPException(
-            status_code=400,
-            detail="Confirm current in-store price"
+            status_code=400, detail="Confirm current in-store price"
         )
 
     category = canonical_category(data.category)
@@ -875,20 +784,12 @@ async def shop_owner_price_update(
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
-                """
-                SELECT id FROM shops
-                WHERE shop_update_token=%s
-                """,
+                "SELECT id FROM shops WHERE shop_update_token=%s",
                 (x_shop_token,)
             )
-
             shop = cursor.fetchone()
-
             if not shop:
-                raise HTTPException(
-                    status_code=401,
-                    detail="Invalid shop token"
-                )
+                raise HTTPException(status_code=401, detail="Invalid shop token")
 
             cursor.execute(
                 """
@@ -899,12 +800,9 @@ async def shop_owner_price_update(
                 LIMIT 1
                 """,
                 (
-                    data.product_name.strip(),
-                    category,
-                    data.unit.strip()
+                    data.product_name.strip(), category, data.unit.strip()
                 )
             )
-
             product = cursor.fetchone()
 
             if product:
@@ -912,27 +810,21 @@ async def shop_owner_price_update(
             else:
                 cursor.execute(
                     """
-                    INSERT INTO products(
-                        product_name, category, unit
-                    )
-                    VALUES(%s,%s,%s)
-                    RETURNING id
+                    INSERT INTO products(product_name, category, unit)
+                    VALUES(%s,%s,%s) RETURNING id
                     """,
                     (
-                        data.product_name.strip(),
-                        category,
-                        data.unit.strip()
+                        data.product_name.strip(), category, data.unit.strip()
                     )
                 )
-
                 product_id = cursor.fetchone()["id"]
 
             cursor.execute(
                 """
                 INSERT INTO prices(
-                    shop_id, product_id, price, price_type,
-                    source_name, source_type, is_live,
-                    in_store_confirmed, valid_until, updated_at
+                    shop_id, product_id, price, price_type, source_name,
+                    source_type, is_live, in_store_confirmed,
+                    valid_until, updated_at
                 )
                 VALUES(
                     %s,%s,%s,'shop_retail',
@@ -943,23 +835,22 @@ async def shop_owner_price_update(
                 """,
                 (shop["id"], product_id, data.price)
             )
-
             result = cursor.fetchone()
 
             cursor.execute(
                 """
-                UPDATE shops
-                SET data_connection_status='owner_updated'
+                UPDATE shops SET data_connection_status='owner_updated'
                 WHERE id=%s
                 """,
                 (shop["id"],)
             )
-
         connection.commit()
 
     return {
         "success": True,
         "price": result,
+        "price_status": "Verified",
+        "verification_type": "Shop owner confirmed",
         "message": "Confirmed in-store price saved for 24 hours"
     }
 
@@ -981,55 +872,35 @@ async def shop_owner_offer_update(
     x_shop_token: Optional[str] = Header(default=None)
 ):
     if not x_shop_token:
-        raise HTTPException(
-            status_code=401,
-            detail="Missing X-Shop-Token"
-        )
+        raise HTTPException(status_code=401, detail="Missing X-Shop-Token")
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
-                """
-                SELECT id FROM shops
-                WHERE shop_update_token=%s
-                """,
+                "SELECT id FROM shops WHERE shop_update_token=%s",
                 (x_shop_token,)
             )
-
             shop = cursor.fetchone()
-
             if not shop:
-                raise HTTPException(
-                    status_code=401,
-                    detail="Invalid shop token"
-                )
+                raise HTTPException(status_code=401, detail="Invalid shop token")
 
             cursor.execute(
                 """
                 INSERT INTO offers(
-                    shop_id, title, description,
-                    discount_text, valid_until
+                    shop_id, title, description, discount_text, valid_until
                 )
                 VALUES(%s,%s,%s,%s,%s)
                 RETURNING id, title, valid_until
                 """,
                 (
-                    shop["id"],
-                    data.title,
-                    data.description,
-                    data.discount_text,
-                    data.valid_until
+                    shop["id"], data.title, data.description,
+                    data.discount_text, data.valid_until
                 )
             )
-
             result = cursor.fetchone()
-
         connection.commit()
 
-    return {
-        "success": True,
-        "offer": result
-    }
+    return {"success": True, "offer": result}
 
 
 # ==========================================================
@@ -1042,8 +913,7 @@ async def get_shops(
     category: str = Query(...)
 ):
     category_value = (
-        "All"
-        if category.strip().casefold() == "all"
+        "All" if category.strip().casefold() == "all"
         else canonical_category(category)
     )
 
@@ -1052,55 +922,39 @@ async def get_shops(
             cursor.execute(
                 """
                 SELECT
-                    s.id,
-                    s.shop_name,
-                    s.shop_name AS name,
-                    s.category,
-                    s.address,
-                    s.phone,
-                    s.is_verified,
-                    s.data_connection_status,
-                    s.latitude,
-                    s.longitude,
-                    s.image_url,
-                    w.ward_number,
-                    w.area_name,
+                    s.id, s.shop_name, s.shop_name AS name, s.category,
+                    s.address, s.phone, s.is_verified,
+                    s.data_connection_status, s.latitude, s.longitude,
+                    s.image_url, w.ward_number, w.area_name,
                     l.locality_name,
-                    latest.product_name,
-                    latest.unit,
-                    latest.price,
-                    latest.updated_at
+                    latest.product_name, latest.unit, latest.price,
+                    latest.updated_at, latest.price_status
                 FROM shops s
                 JOIN wards w ON w.id=s.ward_id
                 LEFT JOIN localities l ON l.id=s.locality_id
                 LEFT JOIN LATERAL (
                     SELECT
-                        p.product_name,
-                        p.unit,
-                        pr.price,
-                        pr.updated_at
+                        p.product_name, p.unit, pr.price, pr.updated_at,
+                        CASE
+                            WHEN pr.valid_until IS NOT NULL
+                                 AND pr.valid_until<=NOW()
+                                THEN 'Expired'
+                            WHEN pr.in_store_confirmed=TRUE
+                                THEN 'Verified'
+                            ELSE 'Estimated'
+                        END AS price_status
                     FROM prices pr
                     JOIN products p ON p.id=pr.product_id
                     WHERE pr.shop_id=s.id
-                      AND pr.in_store_confirmed=TRUE
-                      AND pr.valid_until>NOW()
                     ORDER BY pr.updated_at DESC
                     LIMIT 1
                 ) latest ON TRUE
                 WHERE w.ward_number=%s
-                  AND (
-                    %s='All'
-                    OR LOWER(s.category)=LOWER(%s)
-                  )
+                  AND (%s='All' OR LOWER(s.category)=LOWER(%s))
                 ORDER BY s.shop_name
                 """,
-                (
-                    ward_number,
-                    category_value,
-                    category_value
-                )
+                (ward_number, category_value, category_value)
             )
-
             rows = cursor.fetchall()
 
     return {
@@ -1123,24 +977,24 @@ async def get_shop_products(shop_id: int):
             cursor.execute(
                 """
                 SELECT DISTINCT ON (p.id)
-                    p.id AS product_id,
-                    p.product_name,
-                    p.category,
-                    p.unit,
-                    pr.price,
-                    pr.source_name,
-                    pr.updated_at,
-                    pr.valid_until
+                    p.id AS product_id, p.product_name, p.category, p.unit,
+                    pr.price, pr.source_name, pr.source_type,
+                    pr.updated_at, pr.valid_until,
+                    CASE
+                        WHEN pr.valid_until IS NOT NULL
+                             AND pr.valid_until<=NOW()
+                            THEN 'Expired'
+                        WHEN pr.in_store_confirmed=TRUE
+                            THEN 'Verified'
+                        ELSE 'Estimated'
+                    END AS price_status
                 FROM prices pr
                 JOIN products p ON p.id=pr.product_id
                 WHERE pr.shop_id=%s
-                  AND pr.in_store_confirmed=TRUE
-                  AND pr.valid_until>NOW()
                 ORDER BY p.id, pr.updated_at DESC
                 """,
                 (shop_id,)
             )
-
             rows = cursor.fetchall()
 
     return {
@@ -1152,7 +1006,7 @@ async def get_shop_products(shop_id: int):
 
 
 # ==========================================================
-# PRICE COMPARISON
+# PRICE COMPARISON - CURRENT VERIFIED SHOP PRICES ONLY
 # ==========================================================
 
 @app.get("/api/price-comparison")
@@ -1166,19 +1020,12 @@ async def price_comparison(
             cursor.execute(
                 """
                 SELECT
-                    s.id AS shop_id,
-                    s.shop_name,
-                    s.address,
-                    s.phone,
-                    s.latitude,
-                    s.longitude,
-                    w.ward_number,
-                    l.locality_name,
-                    p.product_name,
-                    p.unit,
-                    pr.price,
-                    pr.updated_at,
-                    pr.valid_until
+                    s.id AS shop_id, s.shop_name, s.address, s.phone,
+                    s.latitude, s.longitude, w.ward_number,
+                    l.locality_name, p.product_name, p.unit,
+                    pr.price, pr.updated_at, pr.valid_until,
+                    'Verified' AS price_status,
+                    'Shop owner confirmed' AS verification_type
                 FROM prices pr
                 JOIN shops s ON s.id=pr.shop_id
                 JOIN wards w ON w.id=s.ward_id
@@ -1191,22 +1038,21 @@ async def price_comparison(
                   AND pr.valid_until>NOW()
                 ORDER BY pr.price ASC, pr.updated_at DESC
                 """,
-                (
-                    ward_number,
-                    product_name,
-                    unit,
-                    unit
-                )
+                (ward_number, product_name, unit, unit)
             )
-
             rows = cursor.fetchall()
 
     return {
         "success": True,
         "ward_number": ward_number,
         "product_name": product_name,
+        "sort": "low_to_high",
         "total_prices": len(rows),
-        "prices": rows
+        "prices": rows,
+        "message": (
+            "No current shop-confirmed prices available"
+            if not rows else None
+        )
     }
 
 
@@ -1223,32 +1069,20 @@ async def get_offers(
             cursor.execute(
                 """
                 SELECT
-                    o.id,
-                    o.title,
-                    o.description,
-                    o.discount_text,
-                    o.valid_from,
-                    o.valid_until,
-                    s.id AS shop_id,
-                    s.shop_name,
-                    s.category,
-                    s.address,
-                    s.phone
+                    o.id, o.title, o.description, o.discount_text,
+                    o.valid_from, o.valid_until, s.id AS shop_id,
+                    s.shop_name, s.category, s.address, s.phone
                 FROM offers o
                 JOIN shops s ON s.id=o.shop_id
                 JOIN wards w ON w.id=s.ward_id
                 WHERE w.ward_number=%s
                   AND o.is_active=TRUE
                   AND o.valid_from<=NOW()
-                  AND (
-                    o.valid_until IS NULL
-                    OR o.valid_until>NOW()
-                  )
+                  AND (o.valid_until IS NULL OR o.valid_until>NOW())
                 ORDER BY o.updated_at DESC
                 """,
                 (ward_number,)
             )
-
             rows = cursor.fetchall()
 
     return {
@@ -1259,60 +1093,166 @@ async def get_offers(
 
 
 # ==========================================================
-# LOCAL SHOP PRICE TRACKER
+# PRICE TRACKER - ALL 50 CATEGORIES
 # ==========================================================
 
 @app.get("/api/price-tracker")
 async def price_tracker(
     ward_number: int = Query(..., ge=1, le=86),
     category: str = Query(...),
-    product_name: Optional[str] = None
+    product_name: Optional[str] = None,
+    sort: str = Query(default="low_to_high")
 ):
     category = canonical_category(category)
+
+    if sort not in ("low_to_high", "high_to_low"):
+        raise HTTPException(
+            status_code=400,
+            detail="sort must be low_to_high or high_to_low"
+        )
+
+    order_sql = "ASC" if sort == "low_to_high" else "DESC"
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
-                """
+                f"""
                 SELECT
-                    s.id AS shop_id,
-                    s.shop_name,
-                    s.address,
-                    s.phone,
-                    w.ward_number,
-                    p.product_name,
-                    p.unit,
-                    pr.price,
-                    pr.updated_at,
-                    pr.valid_until
+                    s.id AS shop_id, s.shop_name, s.address, s.phone,
+                    w.ward_number, p.product_name, p.category, p.unit,
+                    pr.price, pr.source_name, pr.source_type,
+                    pr.updated_at, pr.valid_until,
+                    CASE
+                        WHEN pr.valid_until IS NOT NULL
+                             AND pr.valid_until<=NOW()
+                            THEN 'Expired'
+                        WHEN pr.in_store_confirmed=TRUE
+                            THEN 'Verified'
+                        ELSE 'Estimated'
+                    END AS price_status
                 FROM prices pr
                 JOIN shops s ON s.id=pr.shop_id
                 JOIN wards w ON w.id=s.ward_id
                 JOIN products p ON p.id=pr.product_id
                 WHERE w.ward_number=%s
-                  AND LOWER(s.category)=LOWER(%s)
+                  AND LOWER(p.category)=LOWER(%s)
                   AND (
                     %s IS NULL
                     OR LOWER(p.product_name)=LOWER(%s)
                   )
-                  AND pr.in_store_confirmed=TRUE
-                  AND pr.valid_until>NOW()
-                ORDER BY pr.price ASC
+                ORDER BY pr.price {order_sql}, pr.updated_at DESC
                 """,
-                (
-                    ward_number,
-                    category,
-                    product_name,
-                    product_name
-                )
+                (ward_number, category, product_name, product_name)
             )
-
             rows = cursor.fetchall()
+
+    current_rows = [r for r in rows if r["price_status"] != "Expired"]
 
     return {
         "success": True,
+        "ward_number": ward_number,
+        "category": category,
+        "product_name": product_name,
+        "sort": sort,
         "total_price_records": len(rows),
-        "prices": rows
+        "current_price_records": len(current_rows),
+        "expired_records": len(rows) - len(current_rows),
+        "prices": rows,
+        "data_status": "Available" if current_rows else "Data Not Available",
+        "note": (
+            "Shop-owner-confirmed prices are not government official feeds."
+        )
+    }
+
+
+# ==========================================================
+# UNIFIED TRACKER - ALL CATEGORIES
+# ==========================================================
+
+@app.get("/api/unified-price-tracker")
+async def unified_price_tracker(
+    category: str = Query(default="All"),
+    product_name: Optional[str] = None,
+    ward_number: Optional[int] = Query(default=None, ge=1, le=86),
+    sort: str = Query(default="low_to_high")
+):
+    """
+    Unified price list for all categories.
+    Only actual shop-confirmed prices are shown as Verified.
+    AGMARKNET is exposed separately as wholesale market data.
+    """
+
+    if category.strip().casefold() == "all":
+        category_value = "All"
+    else:
+        category_value = canonical_category(category)
+
+    if sort not in ("low_to_high", "high_to_low"):
+        raise HTTPException(
+            status_code=400,
+            detail="sort must be low_to_high or high_to_low"
+        )
+
+    order_sql = "ASC" if sort == "low_to_high" else "DESC"
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT
+                    s.id AS shop_id, s.shop_name, s.category AS shop_category,
+                    s.address, w.ward_number, p.product_name,
+                    p.category AS product_category, p.unit, pr.price,
+                    pr.price_type, pr.source_name, pr.source_type,
+                    pr.updated_at, pr.valid_until,
+                    CASE
+                        WHEN pr.valid_until IS NOT NULL
+                             AND pr.valid_until<=NOW()
+                            THEN 'Expired'
+                        WHEN pr.in_store_confirmed=TRUE
+                            THEN 'Verified'
+                        ELSE 'Estimated'
+                    END AS price_status
+                FROM prices pr
+                JOIN shops s ON s.id=pr.shop_id
+                JOIN wards w ON w.id=s.ward_id
+                JOIN products p ON p.id=pr.product_id
+                WHERE (%s='All' OR LOWER(p.category)=LOWER(%s))
+                  AND (%s IS NULL OR w.ward_number=%s)
+                  AND (
+                    %s IS NULL OR LOWER(p.product_name)=LOWER(%s)
+                  )
+                ORDER BY pr.price {order_sql}, pr.updated_at DESC
+                """,
+                (
+                    category_value, category_value,
+                    ward_number, ward_number,
+                    product_name, product_name
+                )
+            )
+            rows = cursor.fetchall()
+
+    active = [r for r in rows if r["price_status"] != "Expired"]
+    expired = [r for r in rows if r["price_status"] == "Expired"]
+
+    return {
+        "success": True,
+        "location": "Vijayawada",
+        "category": category_value,
+        "product_name": product_name,
+        "ward_number": ward_number,
+        "sort": sort,
+        "total_categories": len(CATEGORIES),
+        "total_records": len(rows),
+        "active_records": len(active),
+        "expired_records": len(expired),
+        "prices": rows,
+        "data_status": "Available" if active else "Data Not Available",
+        "price_statuses": ["Verified", "Estimated", "Expired"],
+        "note": (
+            "Verified means shop-owner-confirmed in-store price. "
+            "It does not mean government-certified."
+        )
     }
 
 
@@ -1352,29 +1292,23 @@ def fetch_government_market_prices(
         params["filters[commodity]"] = commodity.strip()
 
     url = DATA_GOV_API_URL + "?" + urllib.parse.urlencode(params)
-
     request = urllib.request.Request(
         url,
         headers={
             "Accept": "application/json",
-            "User-Agent": "BezawadaDeals/8.0"
+            "User-Agent": "BezawadaDeals/9.0"
         }
     )
 
     try:
-        with urllib.request.urlopen(
-            request,
-            timeout=25
-        ) as response:
+        with urllib.request.urlopen(request, timeout=25) as response:
             raw = response.read().decode("utf-8")
 
         payload = json.loads(raw)
-
         if not isinstance(payload, dict):
             raise ValueError("Invalid government API response")
 
         records = payload.get("records", [])
-
         if not isinstance(records, list):
             records = []
 
@@ -1408,9 +1342,9 @@ def fetch_government_market_prices(
                     "modal_price": modal,
                     "unit": "quintal",
                     "price_type": "Mandi wholesale",
+                    "price_status": "Verified",
                     "source": AGMARKNET_SOURCE
                 })
-
             except (TypeError, ValueError):
                 continue
 
@@ -1422,9 +1356,11 @@ def fetch_government_market_prices(
             "api_key_configured": True,
             "total_records": len(prices),
             "prices": prices,
-            "checked_at": datetime.now(
-                timezone.utc
-            ).astimezone().isoformat()
+            "checked_at": now_utc().isoformat(),
+            "important_note": (
+                "These are mandi wholesale prices per quintal, "
+                "not supermarket or retail shop prices."
+            )
         }
 
     except Exception as error:
@@ -1437,9 +1373,7 @@ def fetch_government_market_prices(
             "error": str(error),
             "total_records": 0,
             "prices": [],
-            "checked_at": datetime.now(
-                timezone.utc
-            ).astimezone().isoformat()
+            "checked_at": now_utc().isoformat()
         }
 
 
@@ -1462,15 +1396,52 @@ async def market_feed_status():
         "success": True,
         "provider": "data.gov.in",
         "dataset": "AGMARKNET Daily Market Prices",
-        "api_key_configured": bool(
-            os.getenv("DATA_GOV_IN_API_KEY")
-        ),
+        "api_key_configured": bool(os.getenv("DATA_GOV_IN_API_KEY")),
         "data_type": "Daily mandi wholesale prices",
         "district": "Krishna",
         "ward_level_prices": False,
         "retail_shop_prices": False,
         "unit": "quintal",
-        "source": AGMARKNET_SOURCE
+        "source": AGMARKNET_SOURCE,
+        "status": (
+            "Configured" if os.getenv("DATA_GOV_IN_API_KEY")
+            else "API key not configured"
+        )
+    }
+
+
+# ==========================================================
+# OFFICIAL FEED REGISTRY STATUS
+# ==========================================================
+
+@app.get("/api/official-sources")
+async def official_sources():
+    """
+    Does not pretend every category has a live official price feed.
+    Feed status is unavailable until a real source is integrated.
+    """
+    return {
+        "success": True,
+        "location": "Vijayawada",
+        "categories": [
+            {
+                "category": category,
+                "official_retail_feed": "Data Not Available",
+                "estimated_price_generated": False
+            }
+            for category in CATEGORIES
+        ],
+        "available_official_feed": {
+            "name": AGMARKNET_SOURCE,
+            "type": "Mandi wholesale",
+            "endpoint": "/api/market-prices",
+            "not_retail_price": True
+        },
+        "note": (
+            "No supermarket or retailer price is invented. "
+            "A retailer's official feed must be connected before "
+            "its price can be shown as an official retail price."
+        )
     }
 
 
@@ -1496,7 +1467,6 @@ def save_wards_data(data: WardImportRequest):
         )
 
     numbers = [item.ward_number for item in data.wards]
-
     if sorted(numbers) != list(range(1, 87)):
         raise HTTPException(
             status_code=400,
@@ -1510,9 +1480,7 @@ def save_wards_data(data: WardImportRequest):
             for item in data.wards:
                 cursor.execute(
                     """
-                    INSERT INTO wards(
-                        ward_number, area_name, is_active
-                    )
+                    INSERT INTO wards(ward_number, area_name, is_active)
                     VALUES(%s,%s,TRUE)
                     ON CONFLICT(ward_number)
                     DO UPDATE SET
@@ -1520,17 +1488,12 @@ def save_wards_data(data: WardImportRequest):
                         is_active=TRUE
                     RETURNING id
                     """,
-                    (
-                        item.ward_number,
-                        item.area_name.strip()
-                    )
+                    (item.ward_number, item.area_name.strip())
                 )
-
                 ward_id = cursor.fetchone()["id"]
 
                 for locality in item.localities:
                     name = locality.strip()
-
                     if len(name) < 2:
                         continue
 
@@ -1545,10 +1508,8 @@ def save_wards_data(data: WardImportRequest):
                         """,
                         (ward_id, name)
                     )
-
                     if cursor.rowcount:
                         added += 1
-
         connection.commit()
 
     return {
@@ -1575,31 +1536,21 @@ async def import_wards_file(
 ):
     check_admin_key(x_api_key)
 
-    if (
-        not file.filename
-        or not file.filename.lower().endswith(".json")
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail="Upload a JSON file"
-        )
+    if not file.filename or not file.filename.lower().endswith(".json"):
+        raise HTTPException(status_code=400, detail="Upload a JSON file")
 
     try:
         content = await file.read()
         raw = json.loads(content.decode("utf-8-sig"))
         data = WardImportRequest(**raw)
-
         return save_wards_data(data)
-
     except HTTPException:
         raise
-
     except Exception as error:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid ward JSON: {str(error)}"
         )
-
     finally:
         await file.close()
 
@@ -1615,5 +1566,9 @@ async def owner_guide():
         "offer_endpoint": "POST /api/shop/offer-update",
         "required_header": "X-Shop-Token",
         "price_validity": "24 hours",
-        "note": "Shop owners must confirm actual in-store prices."
+        "price_status": "Verified - Shop owner confirmed",
+        "note": (
+            "Shop owners must confirm actual in-store prices. "
+            "This is not the same as a government official feed."
+        )
     }
