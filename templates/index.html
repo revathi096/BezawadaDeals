@@ -297,45 +297,45 @@ footer {
   </div>
 </section>
 
-<!-- LIVE PRICE TRACKER -->
+<!-- GOVERNMENT AGMARKNET PRICE TRACKER -->
 <section class="section" id="liveTracker">
   <div class="heading">
-    <h2>📊 Live Price Tracker</h2>
-    <p>ఎంచుకున్న Ward మరియు Categoryలో అందుబాటులో ఉన్న తాజా ధరలు.</p>
+    <h2>📊 Government Market Price Tracker</h2>
+    <p>Government AGMARKNET నుంచి అందుబాటులో ఉన్న mandi wholesale ధరలు.</p>
   </div>
 
   <div class="panel">
     <div class="filters">
       <div class="field">
         <label for="trackerProduct">Product Name (Optional)</label>
-        <input id="trackerProduct" placeholder="ఉదా: Tomato, Rice, Milk">
+        <input id="trackerProduct" placeholder="ఉదా: Tomato, Rice, Onion">
       </div>
       <div class="field">
-        <label for="trackerUnit">Unit (Optional)</label>
-        <input id="trackerUnit" placeholder="kg / litre / packet">
+        <label>Price Unit</label>
+        <input value="Per Quintal (100 kg)" disabled>
       </div>
     </div>
     <div class="actions">
-      <button class="btn" id="trackerSearch">Check Prices</button>
+      <button class="btn" id="trackerSearch">Check Government Prices</button>
       <button class="btn alt" id="trackerRefresh">Refresh Now</button>
     </div>
   </div>
 
   <div class="tracker-top" style="margin-top:14px">
-    <span id="trackerStatus" class="muted">Ward మరియు Category select చేయండి.</span>
+    <span id="trackerStatus" class="muted">Product ధరలు చూడటానికి Check Government Prices నొక్కండి.</span>
     <span class="muted"><span class="live-dot"></span>Auto check every 5 minutes</span>
   </div>
 
   <div class="tracker-grid" id="trackerResults">
     <div class="empty">
-      ధరలు చూడటానికి Ward మరియు ఒక Category select చేయండి.
+      Government mandi prices ఇక్కడ కనిపిస్తాయి.
     </div>
   </div>
 
   <p class="muted" style="margin-top:10px">
-    గమనిక: Tracker ప్రతి 5 నిమిషాలకు databaseను మళ్లీ చెక్ చేస్తుంది.
-    Databaseలో ఉన్న ధృవీకరించిన ధరలనే చూపిస్తుంది. కొత్త షాపు ధరలు
-    ఆటోమేటిక్‌గా రావాలంటే సంబంధిత అధికారిక data feed అవసరం.
+    గమనిక: ఇవి AGMARKNETలో లభించే district-level mandi wholesale ధరలు మాత్రమే.
+    ఇవి Ward retail shops, supermarkets లేదా Rythu Bazaarలోని ప్రత్యక్ష ధరలు కావు.
+    ధరలు ప్రతి quintal (100 kg)కి చూపబడతాయి. Feed అందుబాటులో లేకపోతే ధరలను ఊహించి చూపించము.
   </p>
 </section>
 
@@ -412,7 +412,7 @@ let ward = "";
 let category = "All";
 let shopRows = [];
 let trackerTimer = null;
-let lastTrackerQuery = "";
+let trackerRequestInProgress = false;
 
 function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, char => ({
@@ -426,16 +426,23 @@ function esc(value) {
 
 async function getData(url) {
   const response = await fetch(url, {cache:"no-store"});
+
   if (!response.ok) {
     throw new Error("Request failed: " + response.status);
   }
+
   return response.json();
 }
 
 function formatDate(value) {
   if (!value) return "సమయం అందుబాటులో లేదు";
+
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "సమయం అందుబాటులో లేదు";
+
+  if (Number.isNaN(date.getTime())) {
+    return "సమయం అందుబాటులో లేదు";
+  }
+
   return date.toLocaleString("en-IN", {
     dateStyle:"medium",
     timeStyle:"short"
@@ -503,6 +510,7 @@ async function initialize() {
       button.appendChild(emoji);
       button.appendChild(name);
       button.addEventListener("click", () => setCategory(item));
+
       $("categories").appendChild(button);
     });
 
@@ -520,8 +528,10 @@ async function loadShops() {
   if (!ward) {
     $("shops").innerHTML =
       '<div class="empty">ముందుగా Ward select చేయండి.</div>';
+
     $("offers").innerHTML =
       '<div class="empty">Ward select చేయండి.</div>';
+
     return;
   }
 
@@ -646,7 +656,7 @@ async function loadOffers() {
   }
 }
 
-/* LIVE PRICE TRACKER */
+/* GOVERNMENT AGMARKNET PRICE TRACKER */
 
 function trackerMessage(message) {
   $("trackerResults").innerHTML =
@@ -654,77 +664,131 @@ function trackerMessage(message) {
 }
 
 async function loadTracker() {
-  ward = $("ward").value;
-  category = $("category").value || "All";
+  if (trackerRequestInProgress) return;
 
-  if (!ward) {
+  const selectedWard = $("ward").value;
+  const selectedCategory = $("category").value || "All";
+
+  if (!selectedWard) {
     $("trackerStatus").textContent = "Ward select చేయండి.";
-    trackerMessage("ధరలు చూడటానికి ముందుగా Ward select చేయండి.");
+    trackerMessage("ముందుగా Ward select చేయండి.");
     return;
   }
 
-  if (category === "All") {
-    $("trackerStatus").textContent = "ఒక Category select చేయండి.";
-    trackerMessage("Live Price Tracker కోసం Vegetables, Fruits, Groceries వంటి ఒక Category select చేయండి.");
+  const supportedCategories = [
+    "Vegetables",
+    "Fruits",
+    "Groceries",
+    "Rice & Pulses"
+  ];
+
+  if (!supportedCategories.includes(selectedCategory)) {
+    $("trackerStatus").textContent =
+      "ఈ Categoryకి AGMARKNET commodity feed లేదు.";
+
+    trackerMessage(
+      "ఈ Categoryకి ప్రస్తుతం AGMARKNET mandi price feed లేదు. ధరలను ఊహించి చూపించము."
+    );
     return;
   }
 
   const product = $("trackerProduct").value.trim();
-  const unit = $("trackerUnit").value.trim();
 
-  let url =
-    `/api/price-tracker?ward_number=${encodeURIComponent(ward)}&category=${encodeURIComponent(category)}`;
+  let url = "/api/market-prices?district=Krishna&limit=100";
 
   if (product) {
-    url += `&product_name=${encodeURIComponent(product)}`;
+    url += "&product_name=" + encodeURIComponent(product);
   }
 
-  lastTrackerQuery = url;
-  $("trackerStatus").textContent = "ధరలను చెక్ చేస్తోంది...";
+  trackerRequestInProgress = true;
+  $("trackerStatus").textContent =
+    "Government AGMARKNET prices loading...";
 
   try {
     const data = await getData(url);
-    const prices = data.prices || [];
 
-    $("trackerStatus").textContent =
-      `Ward ${ward} · ${category} · Last checked: ${formatDate(new Date())}`;
+    if (!data.success) {
+      $("trackerStatus").textContent = "Government feed unavailable";
 
-    const filtered = unit
-      ? prices.filter(item =>
-          String(item.unit || "").toLowerCase() === unit.toLowerCase()
-        )
-      : prices;
-
-    if (!filtered.length) {
       trackerMessage(
-        "ఈ Ward మరియు Categoryలో ప్రస్తుతం చూపించగల ధృవీకరించిన ధరలు లేవు. కొత్త ధరల Feed అందుబాటులో లేదు."
+        data.error || "Government feed ప్రస్తుతం అందుబాటులో లేదు. API key లేదా feed settings చెక్ చేయండి."
       );
       return;
     }
 
-    $("trackerResults").innerHTML = filtered.map((item,index) => `
+    const prices = data.prices || [];
+
+    $("trackerStatus").textContent =
+      "AGMARKNET · Krishna District · Checked: " +
+      formatDate(data.checked_at);
+
+    if (!prices.length) {
+      trackerMessage(
+        "ఈ District/Productకి ప్రభుత్వ APIలో ధరలు లేవు. వేరే product name ప్రయత్నించండి."
+      );
+      return;
+    }
+
+    $("trackerResults").innerHTML = prices.map((item, index) => `
       <article class="tracker-card">
         <div class="row">
-          <span class="tag">Price ${index + 1}</span>
-          <span class="muted">Ward ${esc(item.ward_number)}</span>
+          <span class="tag">Government Mandi Price ${index + 1}</span>
+          <span class="muted">
+            ${esc(item.arrival_date || "Date unavailable")}
+          </span>
         </div>
-        <h3>${esc(item.product_name)}</h3>
-        <div class="tracker-price">₹${esc(item.price)} <small> / ${esc(item.unit)}</small></div>
-        <p class="detail"><b>Shop:</b> ${esc(item.shop_name)}</p>
-        <p class="detail">📍 ${esc(item.address || "Address not available")}</p>
-        <p class="detail">Updated: ${esc(formatDate(item.updated_at))}</p>
+
+        <h3>${esc(item.commodity || "Commodity")}</h3>
+
+        <div class="tracker-price">
+          ₹${esc(item.modal_price)}
+          <small>/ Quintal</small>
+        </div>
+
+        <p class="detail">
+          Minimum Price: ₹${esc(item.min_price)}
+        </p>
+
+        <p class="detail">
+          Maximum Price: ₹${esc(item.max_price)}
+        </p>
+
+        <p class="detail">
+          Market: ${esc(item.market || "Not available")}
+        </p>
+
+        <p class="detail">
+          District: ${esc(item.district || "Krishna")}
+        </p>
+
+        <p class="detail">
+          Variety: ${esc(item.variety || "Not specified")}
+        </p>
+
+        <p class="detail">
+          Grade: ${esc(item.grade || "Not specified")}
+        </p>
+
         <div class="source-note">
-          Source: Existing shop-confirmed database record.
+          Source: Government of India - AGMARKNET
           <br>
-          Valid until: ${esc(formatDate(item.valid_until))}
+          Price Type: Mandi Wholesale
+          <br>
+          Unit: Per Quintal (100 kg)
+          <br>
+          Selected Ward: ${esc(selectedWard)} (district feed; not ward-level pricing)
         </div>
-        ${item.phone ? `<div class="card-actions"><a class="call" href="tel:${esc(item.phone)}">Call Shop</a></div>` : ""}
       </article>
     `).join("");
 
   } catch (error) {
-    $("trackerStatus").textContent = "Tracker data load కాలేదు.";
-    trackerMessage("Tracker error: " + error.message);
+    $("trackerStatus").textContent = "Feed connection failed.";
+    trackerMessage(
+      "Tracker error: " + error.message
+    );
+
+  } finally {
+    trackerRequestInProgress = false;
   }
 }
 
@@ -734,7 +798,10 @@ function startTrackerAutoRefresh() {
   }
 
   trackerTimer = setInterval(() => {
-    if ($("ward").value && $("category").value !== "All") {
+    if (
+      $("ward").value &&
+      $("category").value !== "All"
+    ) {
       loadTracker();
     }
   }, 5 * 60 * 1000);
@@ -824,12 +891,19 @@ $("reset").addEventListener("click", () => {
 
   $("shops").innerHTML =
     '<div class="empty">Ward select చేయండి.</div>';
+
   $("offers").innerHTML =
     '<div class="empty">Ward select చేసిన తర్వాత offers కనిపిస్తాయి.</div>';
+
   $("priceResults").innerHTML =
     '<div class="empty">Ward మరియు product name ఇవ్వండి.</div>';
-  $("trackerStatus").textContent = "Ward మరియు Category select చేయండి.";
-  trackerMessage("ధరలు చూడటానికి Ward మరియు Category select చేయండి.");
+
+  $("trackerStatus").textContent =
+    "Ward మరియు Category select చేయండి.";
+
+  trackerMessage(
+    "ధరలు చూడటానికి Ward మరియు Category select చేయండి."
+  );
 
   setCategory("All");
 });
