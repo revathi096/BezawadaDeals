@@ -1,1571 +1,1384 @@
 
 import os
-import re
 import json
-import asyncio
-from datetime import datetime, timezone
-from contextlib import asynccontextmanager
-from typing import Optional
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+import hashlib
+import hmac
+import secrets
+import logging
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 
 import psycopg
 from psycopg.rows import dict_row
-from fastapi import FastAPI, Header, HTTPException, Query, Request as FastAPIRequest
+from psycopg.types.json import Jsonb
+
+from fastapi import FastAPI, HTTPException, Header, Query
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
+# --------------------------------------------------
+# 1. APPLICATION SETTINGS
+# --------------------------------------------------
 
-APP_VERSION = "15.0.0"
+APP_VERSION = "16.0.0"
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
-DATA_GOV_IN_API_KEY = os.getenv("DATA_GOV_IN_API_KEY", "")
-SHOP_OWNER_TOKEN = os.getenv("SHOP_OWNER_TOKEN", "")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
+SHOP_OWNER_TOKEN = os.getenv("SHOP_OWNER_TOKEN", "")
 
-AGMARKNET_RESOURCE = "9ef84268-d588-465a-a308-a864a43d0070"
-AGMARKNET_URL = f"https://api.data.gov.in/resource/{AGMARKNET_RESOURCE}"
-CONSUMER_AFFAIRS_URL = "https://fcainfoweb.nic.in/Reports/DB/DBprices.aspx"
+DATA_GOV_IN_API_KEY = os.getenv("DATA_GOV_IN_API_KEY", "")
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("bezawadadeals")
 
-CATEGORIES = [
-    "Vegetables", "Fruits", "Rice & Rice Products", "Wheat & Atta",
-    "Dals & Pulses", "Edible Oils", "Spices & Masalas", "Sugar & Jaggery",
-    "Salt", "Dairy & Milk", "Eggs", "Chicken & Meat", "Fish & Seafood",
-    "Bakery", "Packaged Foods", "Snacks", "Biscuits", "Beverages",
-    "Tea & Coffee", "Dry Fruits & Nuts", "Baby Food", "Baby Care",
-    "Personal Care", "Skin Care", "Hair Care", "Household Cleaning",
-    "Laundry", "Home & Kitchen", "Pooja Items", "Stationery",
-    "School Supplies", "Electronics", "Mobile Accessories", "Clothing",
-    "Footwear", "Medicines (OTC)", "Pet Supplies", "Kitchen Essentials",
-    "Water & Disposables", "Frozen Foods", "Ready to Cook",
-    "Organic Products", "Millets", "Cereals", "Poultry Products",
-    "Bakery Ingredients", "Garden Supplies", "Hardware",
-    "Furniture & Home Decor", "Other"
-]
+app = FastAPI(
+    title="BezawadaDeals API",
+    version=APP_VERSION,
+    description="Vijayawada local shop directory and price comparison"
+)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# ---------------------------------------------------------
-# DATABASE
-# ---------------------------------------------------------
+# --------------------------------------------------
+# 2. DATABASE CONNECTION
+# --------------------------------------------------
 
-def db():
+def get_db():
     if not DATABASE_URL:
-        raise RuntimeError(
-            "DATABASE_URL is missing in Render environment variables"
-        )
-
-    url = DATABASE_URL.strip()
-
-    if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1)
+        raise RuntimeError("DATABASE_URL environment variable is missing")
 
     return psycopg.connect(
-        url,
+        DATABASE_URL,
         row_factory=dict_row,
-        connect_timeout=15
+        connect_timeout=20
     )
 
 
-def iso(value):
-    return value.isoformat() if value else None
+def fetch_all(query, params=None):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, params or ())
+            return cur.fetchall()
 
+
+def fetch_one(query, params=None):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, params or ())
+            return cur.fetchone()
+
+
+def execute_query(query, params=None):
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, params or ())
+            return cur.rowcount
+
+
+def now_utc():
+    return datetime.now(timezone.utc)
+
+
+def require_admin(token):
+    if not ADMIN_TOKEN:
+        raise HTTPException(
+            status_code=503,
+            detail="ADMIN_TOKEN is not configured on the server"
+        )
+
+    if not token or not hmac.compare_digest(token, ADMIN_TOKEN):
+        raise HTTPException(status_code=401, detail="Invalid admin token")
+
+
+def require_owner_token(token):
+    if not SHOP_OWNER_TOKEN:
+        raise HTTPException(
+            status_code=503,
+            detail="SHOP_OWNER_TOKEN is not configured"
+        )
+
+    if not token or not hmac.compare_digest(token, SHOP_OWNER_TOKEN):
+        raise HTTPException(status_code=401, detail="Invalid owner token")
+
+
+# --------------------------------------------------
+# 3. SAFE DATABASE INITIALIZATION
+# --------------------------------------------------
 
 def init_db():
     """
-    Existing six main tables are preserved.
-    Only auxiliary government-feed tables are created if missing.
+    Creates only missing supporting tables and indexes.
+    Does not DROP or TRUNCATE existing project tables.
     """
 
-    with db() as con:
+    statements = [
 
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS mandi_prices (
-                id BIGSERIAL PRIMARY KEY,
-                state TEXT,
-                district TEXT,
-                market TEXT,
-                commodity TEXT,
-                variety TEXT,
-                grade TEXT,
-                arrival_date TEXT,
-                min_price NUMERIC(12,2),
-                max_price NUMERIC(12,2),
-                modal_price NUMERIC(12,2),
-                source TEXT DEFAULT 'AGMARKNET / data.gov.in',
-                fetched_at TIMESTAMPTZ DEFAULT NOW()
-            )
-        """)
+        """
+        CREATE TABLE IF NOT EXISTS mandi_prices (
+            id BIGSERIAL PRIMARY KEY,
+            commodity TEXT,
+            variety TEXT,
+            market TEXT,
+            district TEXT,
+            state TEXT,
+            arrival_date DATE,
+            min_price NUMERIC(12,2),
+            max_price NUMERIC(12,2),
+            modal_price NUMERIC(12,2),
+            source_name TEXT DEFAULT 'AGMARKNET',
+            source_record JSONB,
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+        """,
 
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS government_retail_benchmarks (
-                id BIGSERIAL PRIMARY KEY,
-                commodity TEXT NOT NULL,
-                unit TEXT,
-                price NUMERIC(12,2),
-                report_date TEXT,
-                geographic_scope TEXT DEFAULT 'All India average',
-                source TEXT DEFAULT 'Department of Consumer Affairs',
-                fetched_at TIMESTAMPTZ DEFAULT NOW()
-            )
-        """)
+        """
+        CREATE TABLE IF NOT EXISTS government_retail_benchmarks (
+            id BIGSERIAL PRIMARY KEY,
+            commodity TEXT NOT NULL,
+            unit TEXT,
+            price NUMERIC(12,2),
+            source_name TEXT,
+            source_date DATE,
+            source_record JSONB,
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+        """,
 
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS source_sync (
-                source_key TEXT PRIMARY KEY,
-                last_attempt TIMESTAMPTZ,
-                last_success TIMESTAMPTZ,
-                status TEXT,
-                message TEXT DEFAULT ''
-            )
-        """)
+        """
+        CREATE TABLE IF NOT EXISTS source_sync (
+            id BIGSERIAL PRIMARY KEY,
+            source_name TEXT UNIQUE NOT NULL,
+            last_sync_at TIMESTAMPTZ,
+            status TEXT,
+            message TEXT,
+            records_count INTEGER DEFAULT 0
+        )
+        """,
 
-        con.execute("""
-            CREATE INDEX IF NOT EXISTS mandi_lookup_idx
-            ON mandi_prices(district, market, commodity, arrival_date)
-        """)
+        """
+        CREATE INDEX IF NOT EXISTS idx_mandi_district
+        ON mandi_prices(district)
+        """,
 
-        con.execute("""
-            CREATE INDEX IF NOT EXISTS govt_benchmark_lookup_idx
-            ON government_retail_benchmarks(commodity, report_date)
-        """)
+        """
+        CREATE INDEX IF NOT EXISTS idx_mandi_commodity
+        ON mandi_prices(commodity)
+        """,
 
-        con.commit()
+        """
+        CREATE INDEX IF NOT EXISTS idx_mandi_updated
+        ON mandi_prices(updated_at DESC)
+        """,
+
+        """
+        CREATE INDEX IF NOT EXISTS idx_benchmark_commodity
+        ON government_retail_benchmarks(commodity)
+        """,
+
+        """
+        CREATE INDEX IF NOT EXISTS idx_benchmark_date
+        ON government_retail_benchmarks(source_date DESC)
+        """
+    ]
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            for statement in statements:
+                cur.execute(statement)
+
+    logger.info("Database initialization completed safely")
 
 
-# ---------------------------------------------------------
-# SOURCE SYNC STATUS
-# ---------------------------------------------------------
-
-def mark_sync(key, success, message):
-
+@app.on_event("startup")
+def startup_event():
     try:
-        with db() as con:
-
-            con.execute("""
-                INSERT INTO source_sync (
-                    source_key,
-                    last_attempt,
-                    last_success,
-                    status,
-                    message
-                )
-                VALUES (
-                    %s,
-                    NOW(),
-                    CASE WHEN %s THEN NOW() ELSE NULL END,
-                    %s,
-                    %s
-                )
-                ON CONFLICT(source_key)
-                DO UPDATE SET
-                    last_attempt = NOW(),
-                    last_success = CASE
-                        WHEN %s THEN NOW()
-                        ELSE source_sync.last_success
-                    END,
-                    status = EXCLUDED.status,
-                    message = EXCLUDED.message
-            """, (
-                key,
-                success,
-                "OK" if success else "ERROR",
-                str(message)[:500],
-                success
-            ))
-
-            con.commit()
-
-    except Exception as exc:
-        print(f"SYNC_STATUS_ERROR {key}: {exc}")
+        init_db()
+        logger.info("BezawadaDeals API started")
+    except Exception:
+        logger.exception("Database initialization failed")
 
 
-# ---------------------------------------------------------
-# AGMARKNET WHOLESALE DATA
-# ---------------------------------------------------------
+# --------------------------------------------------
+# 4. COMMON VALIDATION HELPERS
+# --------------------------------------------------
 
-def fetch_agmarknet():
+def clean_text(value, max_length=250):
+    if value is None:
+        return None
 
-    if not DATA_GOV_IN_API_KEY:
-        raise RuntimeError(
-            "DATA_GOV_IN_API_KEY is not configured"
+    value = str(value).strip()
+
+    if not value:
+        return None
+
+    return value[:max_length]
+
+
+def valid_price(value):
+    try:
+        price = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid price")
+
+    if not price.is_finite() or price <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Price must be greater than zero"
         )
 
-    total = 0
+    return price.quantize(Decimal("0.01"))
 
-    with db() as con:
 
-        for district in ("NTR", "Krishna"):
-
-            params = {
-                "api-key": DATA_GOV_IN_API_KEY,
-                "format": "json",
-                "limit": 1000,
-                "filters[state]": "Andhra Pradesh",
-                "filters[district]": district
-            }
-
-            request = Request(
-                AGMARKNET_URL + "?" + urlencode(params),
-                headers={
-                    "User-Agent": "BezawadaDeals/15.0"
-                }
-            )
-
-            with urlopen(request, timeout=35) as response:
-                payload = json.loads(
-                    response.read().decode("utf-8")
-                )
-
-            for row in payload.get("records", []):
-
-                dist = str(
-                    row.get("district") or district
-                ).strip()
-
-                if dist.casefold() not in ("ntr", "krishna"):
-                    continue
-
-                market = row.get("market")
-                commodity = row.get("commodity")
-                variety = row.get("variety")
-                arrival_date = row.get("arrival_date")
-                grade = row.get("grade")
-
-                min_price = row.get("min_price") or None
-                max_price = row.get("max_price") or None
-                modal_price = row.get("modal_price") or None
-
-                # Refresh matching record instead of adding duplicates.
-                con.execute("""
-                    DELETE FROM mandi_prices
-                    WHERE LOWER(COALESCE(district, '')) = LOWER(%s)
-                      AND COALESCE(market, '') = COALESCE(%s, '')
-                      AND COALESCE(commodity, '') = COALESCE(%s, '')
-                      AND COALESCE(variety, '') = COALESCE(%s, '')
-                      AND COALESCE(grade, '') = COALESCE(%s, '')
-                      AND COALESCE(arrival_date, '') = COALESCE(%s, '')
-                """, (
-                    dist,
-                    market,
-                    commodity,
-                    variety,
-                    grade,
-                    arrival_date
-                ))
-
-                con.execute("""
-                    INSERT INTO mandi_prices (
-                        state,
-                        district,
-                        market,
-                        commodity,
-                        variety,
-                        grade,
-                        arrival_date,
-                        min_price,
-                        max_price,
-                        modal_price,
-                        fetched_at
-                    )
-                    VALUES (
-                        %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, NOW()
-                    )
-                """, (
-                    row.get("state"),
-                    dist,
-                    market,
-                    commodity,
-                    variety,
-                    grade,
-                    arrival_date,
-                    min_price,
-                    max_price,
-                    modal_price
-                ))
-
-                total += 1
-
-        con.commit()
-
-    mark_sync(
-        "agmarknet",
-        True,
-        f"Processed {total} NTR/Krishna wholesale records"
+def verify_shop_exists(shop_id):
+    shop = fetch_one(
+        """
+        SELECT id, shop_name, category, ward_id, locality_id,
+               is_verified, is_active
+        FROM shops
+        WHERE id = %s
+        """,
+        (shop_id,)
     )
 
-    return total
+    if not shop:
+        raise HTTPException(status_code=404, detail="Shop not found")
+
+    if shop.get("is_active") is False:
+        raise HTTPException(status_code=400, detail="Shop is inactive")
+
+    return shop
 
 
-# ---------------------------------------------------------
-# CONSUMER AFFAIRS NATIONAL RETAIL BENCHMARK
-# ---------------------------------------------------------
-
-def fetch_consumer_affairs():
-
-    from html.parser import HTMLParser
-
-    class Parser(HTMLParser):
-
-        def __init__(self):
-            super().__init__()
-            self.rows = []
-            self.row = None
-            self.cell = None
-
-        def handle_starttag(self, tag, attrs):
-
-            if tag == "tr":
-                self.row = []
-
-            elif tag in ("td", "th") and self.row is not None:
-                self.cell = []
-
-        def handle_data(self, data):
-
-            if self.cell is not None:
-                value = data.strip()
-
-                if value:
-                    self.cell.append(value)
-
-        def handle_endtag(self, tag):
-
-            if (
-                tag in ("td", "th")
-                and self.cell is not None
-                and self.row is not None
-            ):
-                self.row.append(" ".join(self.cell))
-                self.cell = None
-
-            elif tag == "tr" and self.row is not None:
-
-                if self.row:
-                    self.rows.append(self.row)
-
-                self.row = None
-
-    request = Request(
-        CONSUMER_AFFAIRS_URL,
-        headers={
-            "User-Agent": "Mozilla/5.0 BezawadaDeals/15"
-        }
+def verify_product_exists(product_id):
+    product = fetch_one(
+        """
+        SELECT id, product_name, category, unit
+        FROM products
+        WHERE id = %s
+        """,
+        (product_id,)
     )
 
-    with urlopen(request, timeout=35) as response:
-        html = response.read().decode("utf-8", "ignore")
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
 
-    parser = Parser()
-    parser.feed(html)
-
-    date_match = re.search(
-        r"(\d{2}/\d{2}/\d{4})",
-        html
-    )
-
-    report_date = (
-        date_match.group(1)
-        if date_match
-        else datetime.now().strftime("%d/%m/%Y")
-    )
-
-    saved = 0
-
-    with db() as con:
-
-        for row in parser.rows:
-
-            if len(row) < 3:
-                continue
-
-            commodity = row[0].strip()
-
-            if commodity.lower() in (
-                "",
-                "commodity",
-                "commodities"
-            ):
-                continue
-
-            unit = row[1].strip()
-
-            raw = re.sub(
-                r"[^0-9.]",
-                "",
-                row[2].replace(",", "")
-            )
-
-            try:
-                price = float(raw)
-            except (ValueError, TypeError):
-                continue
-
-            if price <= 0:
-                continue
-
-            con.execute("""
-                DELETE FROM government_retail_benchmarks
-                WHERE LOWER(commodity) = LOWER(%s)
-                  AND report_date = %s
-                  AND geographic_scope = 'All India average'
-            """, (
-                commodity,
-                report_date
-            ))
-
-            con.execute("""
-                INSERT INTO government_retail_benchmarks (
-                    commodity,
-                    unit,
-                    price,
-                    report_date,
-                    geographic_scope,
-                    source,
-                    fetched_at
-                )
-                VALUES (
-                    %s, %s, %s, %s,
-                    'All India average',
-                    'Department of Consumer Affairs',
-                    NOW()
-                )
-            """, (
-                commodity,
-                unit,
-                price,
-                report_date
-            ))
-
-            saved += 1
-
-        con.commit()
-
-    if not saved:
-        raise RuntimeError(
-            "Consumer Affairs page did not yield readable price rows"
-        )
-
-    mark_sync(
-        "consumer_affairs",
-        True,
-        f"Saved {saved} All-India benchmark rows for {report_date}"
-    )
-
-    return saved
+    return product
 
 
-# ---------------------------------------------------------
-# AUTOMATIC GOVERNMENT DATA SYNC
-# ---------------------------------------------------------
-
-async def sync_loop():
-
-    while True:
-
-        for key, fn in (
-            ("agmarknet", fetch_agmarknet),
-            ("consumer_affairs", fetch_consumer_affairs)
-        ):
-
-            try:
-                await asyncio.to_thread(fn)
-
-            except Exception as exc:
-                mark_sync(key, False, str(exc))
-                print(f"SYNC_ERROR {key}: {exc}")
-
-        await asyncio.sleep(3600)
-
-
-# ---------------------------------------------------------
-# FASTAPI LIFESPAN
-# ---------------------------------------------------------
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-
-    await asyncio.to_thread(init_db)
-
-    task = asyncio.create_task(sync_loop())
-
-    try:
-        yield
-
-    finally:
-        task.cancel()
-
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
-
-
-app = FastAPI(
-    title="BezawadaDeals",
-    version=APP_VERSION,
-    lifespan=lifespan
-)
-
-templates = Jinja2Templates(directory="templates")
-
-
-# ---------------------------------------------------------
-# HOME
-# ---------------------------------------------------------
-
-@app.get("/", response_class=HTMLResponse)
-def home(request: FastAPIRequest):
-
-    return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={
-            "version": APP_VERSION
-        }
-    )
-
-
-# ---------------------------------------------------------
-# HEALTH
-# ---------------------------------------------------------
+# --------------------------------------------------
+# 5. DATABASE STATUS
+# --------------------------------------------------
 
 @app.get("/health")
 def health():
-
     try:
-
-        with db() as con:
-            con.execute("SELECT 1")
+        result = fetch_one("SELECT NOW() AS database_time")
 
         return {
-            "ok": True,
+            "status": "ok",
+            "application": "BezawadaDeals",
             "version": APP_VERSION,
-            "database": "connected"
+            "database": "connected",
+            "database_time": result["database_time"]
         }
 
     except Exception as exc:
+        logger.exception("Health check failed")
 
         return {
-            "ok": False,
-            "version": APP_VERSION,
-            "database_error": str(exc)
+            "status": "error",
+            "database": "disconnected",
+            "message": str(exc)
         }
 
 
-# ---------------------------------------------------------
-# CATEGORIES
-# ---------------------------------------------------------
+@app.get("/api/status")
+def api_status():
+    tables = [
+        "wards",
+        "localities",
+        "business_categories",
+        "shops",
+        "products",
+        "prices",
+        "offers",
+        "shop_owners",
+        "price_submissions",
+        "price_history"
+    ]
+
+    counts = {}
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            for table in tables:
+                # Table names are fixed internal constants, not user input.
+                cur.execute(f"SELECT COUNT(*) AS total FROM {table}")
+                result = cur.fetchone()
+                counts[table] = result["total"]
+
+    return {
+        "application": "BezawadaDeals",
+        "version": APP_VERSION,
+        "database": "connected",
+        "counts": counts
+    }
+
+   
+# --------------------------------------------------
+# 6. CATEGORIES API
+# --------------------------------------------------
 
 @app.get("/api/categories")
-def categories():
+def get_categories():
+    return fetch_all(
+        """
+        SELECT id, category_name
+        FROM business_categories
+        WHERE is_active = TRUE
+        ORDER BY category_name
+        """
+    )
 
-    return {
-        "count": len(CATEGORIES),
-        "categories": CATEGORIES
-    }
 
-
-# ---------------------------------------------------------
-# WARDS
-# ---------------------------------------------------------
+# --------------------------------------------------
+# 7. WARDS API
+# --------------------------------------------------
 
 @app.get("/api/wards")
-def wards():
-
-    with db() as con:
-
-        rows = con.execute("""
-            SELECT
-                id,
-                ward_number,
-                COALESCE(
-                    NULLIF(BTRIM(ward_name), ''),
-                    NULLIF(BTRIM(area_name), ''),
-                    'Ward ' || ward_number::text
-                ) AS ward_name,
-                area_name,
-                boundary_description
-            FROM wards
-            WHERE is_active IS DISTINCT FROM FALSE
-            ORDER BY ward_number
-        """).fetchall()
-
-    return {
-        "count": len(rows),
-        "wards": rows
-    }
+def get_wards():
+    return fetch_all(
+        """
+        SELECT
+            id,
+            ward_number,
+            COALESCE(ward_name, area_name) AS ward_name,
+            area_name,
+            is_active
+        FROM wards
+        WHERE COALESCE(is_active, TRUE) = TRUE
+        ORDER BY ward_number
+        """
+    )
 
 
-# ---------------------------------------------------------
-# LOCALITIES
-# ---------------------------------------------------------
+# --------------------------------------------------
+# 8. LOCALITIES API
+# --------------------------------------------------
 
 @app.get("/api/localities")
-def localities(ward_number: Optional[int] = None):
-
-    sql = """
+def get_localities(
+    ward_id: int | None = None,
+    include_unverified: bool = True
+):
+    query = """
         SELECT
             l.id,
-            l.locality_name AS name,
-            l.locality_name_te,
-            l.is_verified AS verified,
             l.ward_id,
-            w.ward_number
+            l.locality_name,
+            l.locality_name_te,
+            l.is_verified,
+            w.ward_number,
+            COALESCE(w.ward_name, w.area_name) AS ward_name
         FROM localities l
         LEFT JOIN wards w ON w.id = l.ward_id
+        WHERE 1=1
     """
 
-    args = []
+    params = []
 
-    if ward_number is not None:
-        sql += " WHERE w.ward_number = %s"
-        args.append(ward_number)
+    if ward_id is not None:
+        query += " AND l.ward_id = %s"
+        params.append(ward_id)
 
-    sql += " ORDER BY l.locality_name"
+    if not include_unverified:
+        query += " AND l.is_verified = TRUE"
 
-    with db() as con:
-        rows = con.execute(sql, args).fetchall()
+    query += " ORDER BY w.ward_number, l.locality_name"
 
-    return {
-        "count": len(rows),
-        "localities": rows
-    }
+    return fetch_all(query, params)
 
 
-# ---------------------------------------------------------
-# SHOPS
-# Verified and unverified shops are both visible.
-# ---------------------------------------------------------
+# --------------------------------------------------
+# 9. SHOPS DIRECTORY API
+# --------------------------------------------------
 
 @app.get("/api/shops")
-def shops(
-    area: Optional[str] = None,
-    ward_number: Optional[int] = None,
-    shop_type: Optional[str] = None
+def get_shops(
+    category: str | None = None,
+    ward_id: int | None = None,
+    locality_id: int | None = None,
+    search: str | None = None,
+    verified_only: bool = False,
+    limit: int = Query(default=500, ge=1, le=2000)
 ):
-
-    sql = """
+    query = """
         SELECT
             s.id,
-            s.shop_name AS name,
+            s.shop_name,
             s.category,
+            s.category_id,
             s.address,
             s.phone,
+            s.email,
+            s.website,
+            s.opening_hours,
+            s.description,
+            s.image_url,
             s.ward_id,
+            s.locality_id,
+            COALESCE(s.locality, l.locality_name) AS locality,
+            COALESCE(w.ward_name, w.area_name) AS ward_name,
             w.ward_number,
-            COALESCE(
-                NULLIF(BTRIM(s.locality), ''),
-                l.locality_name,
-                w.area_name
-            ) AS area,
             s.is_verified,
-            s.data_connection_status
+            s.is_active,
+            CASE
+                WHEN s.is_verified = TRUE THEN 'Verified'
+                ELSE 'Unverified'
+            END AS verification_status
         FROM shops s
         LEFT JOIN wards w ON w.id = s.ward_id
         LEFT JOIN localities l ON l.id = s.locality_id
-        WHERE TRUE
+        WHERE COALESCE(s.is_active, TRUE) = TRUE
     """
 
-    args = []
+    params = []
 
-    if area:
-        sql += """
-            AND LOWER(
-                COALESCE(s.locality, l.locality_name, '')
-            ) = LOWER(%s)
+    if category:
+        query += " AND LOWER(s.category) = LOWER(%s)"
+        params.append(category.strip())
+
+    if ward_id is not None:
+        query += " AND s.ward_id = %s"
+        params.append(ward_id)
+
+    if locality_id is not None:
+        query += " AND s.locality_id = %s"
+        params.append(locality_id)
+
+    if verified_only:
+        query += " AND s.is_verified = TRUE"
+
+    if search:
+        query += """
+            AND (
+                s.shop_name ILIKE %s
+                OR s.category ILIKE %s
+                OR COALESCE(s.address, '') ILIKE %s
+                OR COALESCE(s.locality, l.locality_name, '') ILIKE %s
+            )
         """
-        args.append(area)
+        term = f"%{search.strip()}%"
+        params.extend([term, term, term, term])
 
-    if ward_number is not None:
-        sql += " AND w.ward_number = %s"
-        args.append(ward_number)
+    query += " ORDER BY s.shop_name LIMIT %s"
+    params.append(limit)
 
-    if shop_type:
-        sql += """
-            AND LOWER(COALESCE(s.category, '')) = LOWER(%s)
-        """
-        args.append(shop_type)
-
-    sql += " ORDER BY area, s.shop_name"
-
-    with db() as con:
-        rows = con.execute(sql, args).fetchall()
-
-    return {
-        "count": len(rows),
-        "shops": rows
-    }
+    return fetch_all(query, params)
 
 
-# ---------------------------------------------------------
-# UNIFIED LOCAL PRICE TRACKER
-# ---------------------------------------------------------
+# --------------------------------------------------
+# 10. PRODUCTS API
+# --------------------------------------------------
+
+@app.get("/api/products")
+def get_products(
+    category: str | None = None,
+    search: str | None = None
+):
+    query = """
+        SELECT id, product_name, category, unit, description
+        FROM products
+        WHERE 1=1
+    """
+
+    params = []
+
+    if category:
+        query += " AND category ILIKE %s"
+        params.append(f"%{category.strip()}%")
+
+    if search:
+        query += " AND product_name ILIKE %s"
+        params.append(f"%{search.strip()}%")
+
+    query += " ORDER BY product_name"
+
+    return fetch_all(query, params)
+
+
+# --------------------------------------------------
+# 11. VERIFIED PRICE COMPARISON
+# --------------------------------------------------
 
 @app.get("/api/unified-price-tracker")
 @app.get("/api/price-tracker")
 def unified_price_tracker(
-    category: Optional[str] = None,
-    area: Optional[str] = None,
-    ward_number: Optional[int] = None,
-    product: Optional[str] = None,
-    source_type: Optional[str] = None,
-    sort: str = "low",
-    include_expired: bool = False
+    search: str | None = None,
+    category: str | None = None,
+    ward_id: int | None = None,
+    locality_id: int | None = None,
+    shop_id: int | None = None,
+    sort: str = "low_to_high",
+    limit: int = Query(default=500, ge=1, le=2000)
 ):
-
-    sql = """
+    query = """
         SELECT
             p.id AS price_id,
-            pr.product_name AS product,
-            pr.category,
+            pr.id AS product_id,
+            pr.product_name,
+            pr.category AS product_category,
             pr.unit,
             p.price,
-            s.shop_name AS shop,
-            s.category AS shop_type,
-            s.address,
-            w.ward_number,
-            COALESCE(
-                NULLIF(BTRIM(s.locality), ''),
-                l.locality_name,
-                w.area_name
-            ) AS area,
-            p.source_name AS source,
+            p.price_type,
+            p.source_name,
             p.source_type,
-            CASE
-                WHEN p.valid_until IS NOT NULL
-                     AND p.valid_until < NOW()
-                    THEN 'Expired'
-                WHEN p.source_type = 'Verified'
-                    THEN 'Verified'
-                WHEN p.in_store_confirmed
-                    THEN 'Owner-confirmed'
-                ELSE 'Estimated'
-            END AS status,
-            p.updated_at AS observed_at,
-            p.valid_until AS expires_at
+            p.updated_at,
+            p.valid_until,
+            s.id AS shop_id,
+            s.shop_name,
+            s.category AS shop_category,
+            s.address,
+            s.phone,
+            s.ward_id,
+            s.locality_id,
+            COALESCE(s.locality, l.locality_name) AS locality,
+            COALESCE(w.ward_name, w.area_name) AS ward_name,
+            w.ward_number,
+            s.is_verified AS shop_verified
         FROM prices p
         JOIN products pr ON pr.id = p.product_id
         JOIN shops s ON s.id = p.shop_id
         LEFT JOIN wards w ON w.id = s.ward_id
         LEFT JOIN localities l ON l.id = s.locality_id
-        WHERE p.is_live = TRUE
-          AND p.in_store_confirmed = TRUE
+        WHERE
+            p.price > 0
+            AND COALESCE(s.is_active, TRUE) = TRUE
+            AND p.in_store_confirmed = TRUE
+            AND (p.valid_until IS NULL OR p.valid_until > NOW())
     """
 
-    args = []
+    params = []
+
+    if search:
+        query += " AND pr.product_name ILIKE %s"
+        params.append(f"%{search.strip()}%")
 
     if category:
-        sql += " AND LOWER(pr.category) = LOWER(%s)"
-        args.append(category)
+        # This filter is for the shop/business category.
+        query += " AND s.category ILIKE %s"
+        params.append(f"%{category.strip()}%")
 
-    if area:
-        sql += """
-            AND LOWER(
-                COALESCE(s.locality, l.locality_name, '')
-            ) = LOWER(%s)
-        """
-        args.append(area)
+    if ward_id is not None:
+        query += " AND s.ward_id = %s"
+        params.append(ward_id)
 
-    if ward_number is not None:
-        sql += " AND w.ward_number = %s"
-        args.append(ward_number)
+    if locality_id is not None:
+        query += " AND s.locality_id = %s"
+        params.append(locality_id)
 
-    if product:
-        sql += " AND pr.product_name ILIKE %s"
-        args.append(f"%{product}%")
+    if shop_id is not None:
+        query += " AND s.id = %s"
+        params.append(shop_id)
 
-    # Shop type filter must use shops.category.
-    if source_type:
-        sql += """
-            AND LOWER(COALESCE(s.category, '')) = LOWER(%s)
-        """
-        args.append(source_type)
+    if sort == "high_to_low":
+        query += " ORDER BY pr.product_name, p.price DESC"
+    else:
+        query += " ORDER BY pr.product_name, p.price ASC"
 
-    if not include_expired:
-        sql += """
-            AND (
-                p.valid_until IS NULL
-                OR p.valid_until >= NOW()
-            )
-        """
+    query += " LIMIT %s"
+    params.append(limit)
 
-    sql += " ORDER BY p.updated_at DESC"
-
-    with db() as con:
-        rows = con.execute(sql, args).fetchall()
-
-    for row in rows:
-
-        row["price"] = float(row["price"])
-
-        row["observed_at"] = iso(
-            row["observed_at"]
-        )
-
-        row["expires_at"] = iso(
-            row["expires_at"]
-        )
-
-    rows.sort(
-        key=lambda x: x["price"],
-        reverse=(sort.lower() == "high")
-    )
-
-    return {
-        "count": len(rows),
-        "prices": rows,
-        "updated_at": datetime.now(timezone.utc).isoformat()
-    }
+    return fetch_all(query, params)
 
 
-# ---------------------------------------------------------
-# WHOLESALE MANDI PRICES
-# ---------------------------------------------------------
-
-@app.get("/api/market-prices")
-def market_prices(
-    commodity: Optional[str] = None,
-    limit: int = Query(300, ge=1, le=1000)
-):
-
-    sql = "SELECT * FROM mandi_prices"
-
-    args = []
-
-    if commodity:
-        sql += " WHERE commodity ILIKE %s"
-        args.append(f"%{commodity}%")
-
-    sql += " ORDER BY arrival_date DESC, market LIMIT %s"
-    args.append(limit)
-
-    with db() as con:
-        rows = con.execute(sql, args).fetchall()
-
-    for row in rows:
-
-        for key in (
-            "min_price",
-            "max_price",
-            "modal_price"
-        ):
-            if row[key] is not None:
-                row[key] = float(row[key])
-
-        row["fetched_at"] = iso(row["fetched_at"])
-
-    return {
-        "count": len(rows),
-        "prices": rows,
-        "unit": "₹ per quintal",
-        "source": "AGMARKNET / data.gov.in wholesale mandi data"
-    }
-
-
-# ---------------------------------------------------------
-# GOVERNMENT RETAIL BENCHMARKS
-# ---------------------------------------------------------
-
-@app.get("/api/official-retail-prices")
-def official_retail_prices():
-
-    with db() as con:
-
-        rows = con.execute("""
-            SELECT
-                commodity,
-                unit,
-                price,
-                report_date,
-                geographic_scope,
-                source,
-                fetched_at
-            FROM government_retail_benchmarks
-            ORDER BY commodity
-        """).fetchall()
-
-    for row in rows:
-
-        row["price"] = (
-            float(row["price"])
-            if row["price"] is not None
-            else None
-        )
-
-        row["fetched_at"] = iso(row["fetched_at"])
-
-    return {
-        "count": len(rows),
-        "prices": rows,
-        "note": (
-            "All-India government benchmark only; "
-            "not Vijayawada-specific shop prices."
-        )
-    }
-
-
-# ---------------------------------------------------------
-# OFFERS
-# ---------------------------------------------------------
+# --------------------------------------------------
+# 12. OFFERS API
+# --------------------------------------------------
 
 @app.get("/api/offers")
-def offers(area: Optional[str] = None):
-
-    sql = """
+def get_offers(
+    category: str | None = None,
+    ward_id: int | None = None,
+    limit: int = Query(default=300, ge=1, le=1000)
+):
+    query = """
         SELECT
             o.id,
+            o.shop_id,
+            s.shop_name,
+            s.category AS shop_category,
+            s.address,
+            s.ward_id,
+            COALESCE(w.ward_name, w.area_name) AS ward_name,
+            o.product_id,
+            p.product_name,
             o.title,
             o.description,
             o.discount_text,
+            o.offer_type,
+            o.terms_conditions,
             o.valid_from,
             o.valid_until,
-            s.shop_name AS shop,
-            COALESCE(
-                NULLIF(BTRIM(s.locality), ''),
-                l.locality_name,
-                w.area_name
-            ) AS area,
-            w.ward_number
+            o.source_type,
+            o.is_verified
         FROM offers o
-        LEFT JOIN shops s ON s.id = o.shop_id
+        JOIN shops s ON s.id = o.shop_id
+        LEFT JOIN products p ON p.id = o.product_id
         LEFT JOIN wards w ON w.id = s.ward_id
-        LEFT JOIN localities l ON l.id = s.locality_id
-        WHERE o.is_active = TRUE
-          AND (
-              o.valid_until IS NULL
-              OR o.valid_until >= NOW()
-          )
+        WHERE
+            o.is_active = TRUE
+            AND COALESCE(s.is_active, TRUE) = TRUE
+            AND (o.valid_from IS NULL OR o.valid_from <= NOW())
+            AND (o.valid_until IS NULL OR o.valid_until >= NOW())
     """
 
-    args = []
+    params = []
 
-    if area:
-        sql += """
-            AND LOWER(
-                COALESCE(s.locality, l.locality_name, '')
-            ) = LOWER(%s)
-        """
-        args.append(area)
+    if category:
+        query += " AND s.category ILIKE %s"
+        params.append(f"%{category.strip()}%")
 
-    sql += " ORDER BY o.updated_at DESC"
+    if ward_id is not None:
+        query += " AND s.ward_id = %s"
+        params.append(ward_id)
 
-    with db() as con:
-        rows = con.execute(sql, args).fetchall()
+    query += " ORDER BY o.valid_until NULLS LAST LIMIT %s"
+    params.append(limit)
 
-    for row in rows:
-
-        row["valid_from"] = iso(row["valid_from"])
-        row["valid_until"] = iso(row["valid_until"])
-
-    return {
-        "count": len(rows),
-        "offers": rows
-    }
+    return fetch_all(query, params)
 
 
-# ---------------------------------------------------------
-# DATABASE STATUS
-# ---------------------------------------------------------
+# --------------------------------------------------
+# 13. OFFICIAL PRICE DATA ENDPOINTS
+# --------------------------------------------------
 
-@app.get("/api/status")
-def status():
-
-    tables = (
-        "wards",
-        "localities",
-        "shops",
-        "products",
-        "prices",
-        "offers",
-        "mandi_prices",
-        "government_retail_benchmarks"
-    )
-
-    with db() as con:
-
-        counts = {}
-
-        for table in tables:
-
-            result = con.execute(
-                f"SELECT COUNT(*) AS n FROM {table}"
-            ).fetchone()
-
-            counts[table] = result["n"]
-
-        sync = con.execute("""
-            SELECT
-                source_key,
-                last_attempt,
-                last_success,
-                status,
-                message
-            FROM source_sync
-            ORDER BY source_key
-        """).fetchall()
-
-    for row in sync:
-
-        row["last_attempt"] = iso(row["last_attempt"])
-        row["last_success"] = iso(row["last_success"])
-
-    return {
-        "version": APP_VERSION,
-        "counts": counts,
-        "sources": sync,
-        "page_refresh_minutes": 5
-    }
-
-
-# ---------------------------------------------------------
-# SHOP OWNER PRICE UPDATE
-# ---------------------------------------------------------
-
-@app.post("/api/shop/price-update")
-def shop_price_update(
-    payload: dict,
-    x_shop_token: str = Header(default="")
+@app.get("/api/market-prices")
+def get_market_prices(
+    commodity: str | None = None,
+    district: str | None = None,
+    limit: int = Query(default=300, ge=1, le=1000)
 ):
+    query = """
+        SELECT
+            id,
+            commodity,
+            variety,
+            market,
+            district,
+            state,
+            arrival_date,
+            min_price,
+            max_price,
+            modal_price,
+            source_name,
+            updated_at
+        FROM mandi_prices
+        WHERE 1=1
+    """
 
-    if not SHOP_OWNER_TOKEN or x_shop_token != SHOP_OWNER_TOKEN:
-        raise HTTPException(
-            401,
-            "Invalid SHOP_OWNER_TOKEN"
-        )
+    params = []
 
-    required = (
-        "shop_name",
-        "shop_type",
-        "area",
-        "ward_number",
-        "product",
-        "category",
-        "unit",
-        "price",
-        "confirmed"
-    )
+    if commodity:
+        query += " AND commodity ILIKE %s"
+        params.append(f"%{commodity.strip()}%")
 
-    missing = [
-        key
-        for key in required
-        if payload.get(key) in (None, "")
-    ]
+    if district:
+        query += " AND district ILIKE %s"
+        params.append(f"%{district.strip()}%")
 
-    if missing:
-        raise HTTPException(
-            400,
-            "Missing: " + ", ".join(missing)
-        )
+    query += " ORDER BY arrival_date DESC NULLS LAST LIMIT %s"
+    params.append(limit)
 
-    if payload.get("confirmed") is not True:
-        raise HTTPException(
-            400,
-            "Confirm that this is the current selling price"
-        )
-
-    try:
-        price = float(payload["price"])
-        ward_number = int(payload["ward_number"])
-
-    except (TypeError, ValueError):
-        raise HTTPException(
-            400,
-            "Invalid price or ward number"
-        )
-
-    if price <= 0 or not 1 <= ward_number <= 86:
-        raise HTTPException(
-            400,
-            "Price must be positive and ward must be 1–86"
-        )
-
-    category = str(payload["category"]).strip()
-
-    if category not in CATEGORIES:
-        raise HTTPException(
-            400,
-            "Invalid category"
-        )
-
-    shop_name = str(payload["shop_name"]).strip()
-    shop_type = str(payload["shop_type"]).strip()
-    area = str(payload["area"]).strip()
-    product_name = str(payload["product"]).strip()
-    unit = str(payload["unit"]).strip()
-
-    if not all((
-        shop_name,
-        area,
-        product_name,
-        unit,
-        shop_type
-    )):
-        raise HTTPException(
-            400,
-            "Shop, area, product and unit are required"
-        )
-
-    with db() as con:
-
-        # Serialize same-name/same-ward submissions.
-        con.execute(
-            """
-            SELECT pg_advisory_xact_lock(
-                hashtextextended(
-                    LOWER(BTRIM(%s)) || ':' || %s::text,
-                    0
-                )
-            )
-            """,
-            (shop_name, ward_number)
-        )
-
-        ward = con.execute("""
-            SELECT id
-            FROM wards
-            WHERE ward_number = %s
-              AND is_active IS DISTINCT FROM FALSE
-        """, (ward_number,)).fetchone()
-
-        if not ward:
-            raise HTTPException(
-                400,
-                "Ward not found"
-            )
-
-        locality = con.execute("""
-            SELECT id
-            FROM localities
-            WHERE LOWER(BTRIM(locality_name)) = LOWER(BTRIM(%s))
-              AND ward_id = %s
-            ORDER BY id
-            LIMIT 1
-        """, (
-            area,
-            ward["id"]
-        )).fetchone()
-
-        if not locality:
-
-            locality = con.execute("""
-                INSERT INTO localities (
-                    ward_id,
-                    locality_name,
-                    locality_name_te,
-                    is_verified
-                )
-                VALUES (%s, %s, NULL, FALSE)
-                RETURNING id
-            """, (
-                ward["id"],
-                area
-            )).fetchone()
-
-        # Find an existing shop in the same ward first.
-        # If ward_id is NULL, a matching directory record can be reused.
-        shop = con.execute("""
-            SELECT id
-            FROM shops
-            WHERE LOWER(BTRIM(shop_name)) = LOWER(BTRIM(%s))
-              AND (
-                    ward_id = %s
-                    OR ward_id IS NULL
-              )
-            ORDER BY
-                CASE
-                    WHEN ward_id = %s THEN 0
-                    ELSE 1
-                END,
-                id
-            LIMIT 1
-        """, (
-            shop_name,
-            ward["id"],
-            ward["id"]
-        )).fetchone()
-
-        address = str(
-            payload.get("address") or ""
-        ).strip()
-
-        phone = str(
-            payload.get("phone") or ""
-        ).strip()
-
-        if shop:
-
-            shop_id = shop["id"]
-
-            con.execute("""
-                UPDATE shops
-                SET
-                    category = %s,
-                    ward_id = %s,
-                    locality_id = %s,
-                    locality = %s,
-                    address = CASE
-                        WHEN %s <> '' THEN %s
-                        ELSE address
-                    END,
-                    phone = CASE
-                        WHEN %s <> '' THEN %s
-                        ELSE phone
-                    END,
-                    data_connection_status = 'Owner update'
-                WHERE id = %s
-            """, (
-                shop_type,
-                ward["id"],
-                locality["id"],
-                area,
-                address,
-                address,
-                phone,
-                phone,
-                shop_id
-            ))
-
-        else:
-
-            shop_id = con.execute("""
-                INSERT INTO shops (
-                    shop_name,
-                    category,
-                    ward_id,
-                    locality_id,
-                    locality,
-                    address,
-                    phone,
-                    is_verified,
-                    data_connection_status
-                )
-                VALUES (
-                    %s, %s, %s, %s, %s, %s, %s,
-                    FALSE,
-                    'Owner update'
-                )
-                RETURNING id
-            """, (
-                shop_name,
-                shop_type,
-                ward["id"],
-                locality["id"],
-                area,
-                address,
-                phone
-            )).fetchone()["id"]
-
-        # Reuse an existing matching product.
-        prod = con.execute("""
-            SELECT id
-            FROM products
-            WHERE LOWER(BTRIM(product_name)) = LOWER(BTRIM(%s))
-              AND LOWER(BTRIM(category)) = LOWER(BTRIM(%s))
-              AND LOWER(BTRIM(unit)) = LOWER(BTRIM(%s))
-            ORDER BY id
-            LIMIT 1
-        """, (
-            product_name,
-            category,
-            unit
-        )).fetchone()
-
-        if not prod:
-
-            prod = con.execute("""
-                INSERT INTO products (
-                    product_name,
-                    category,
-                    unit
-                )
-                VALUES (%s, %s, %s)
-                RETURNING id
-            """, (
-                product_name,
-                category,
-                unit
-            )).fetchone()
-
-        # Save new price record.
-        con.execute("""
-            INSERT INTO prices (
-                shop_id,
-                product_id,
-                price,
-                price_type,
-                source_name,
-                source_type,
-                is_live,
-                in_store_confirmed,
-                updated_at,
-                valid_until
-            )
-            VALUES (
-                %s,
-                %s,
-                %s,
-                'Retail',
-                'Shop-owner submitted',
-                'Owner-confirmed',
-                TRUE,
-                TRUE,
-                NOW(),
-                NOW() + INTERVAL '24 hours'
-            )
-        """, (
-            shop_id,
-            prod["id"],
-            price
-        ))
-
-        con.commit()
-
-    return {
-        "ok": True,
-        "shop_id": shop_id,
-        "product_id": prod["id"],
-        "message": (
-            "Owner-confirmed price saved for 24 hours; "
-            "awaiting independent verification."
-        ),
-        "price": price
-    }
+    return fetch_all(query, params)
 
 
-# ---------------------------------------------------------
-# ADMIN PRICE VERIFICATION
-# ---------------------------------------------------------
-
-@app.post("/api/admin/prices/{price_id}/verify")
-def verify_price(
-    price_id: int,
-    x_admin_token: str = Header(default="")
+@app.get("/api/official-retail-prices")
+def get_official_retail_prices(
+    commodity: str | None = None,
+    limit: int = Query(default=300, ge=1, le=1000)
 ):
+    query = """
+        SELECT
+            id,
+            commodity,
+            unit,
+            price,
+            source_name,
+            source_date,
+            updated_at
+        FROM government_retail_benchmarks
+        WHERE 1=1
+    """
 
-    if not ADMIN_TOKEN or x_admin_token != ADMIN_TOKEN:
-        raise HTTPException(
-            401,
-            "Invalid ADMIN_TOKEN"
-        )
+    params = []
 
-    with db() as con:
+    if commodity:
+        query += " AND commodity ILIKE %s"
+        params.append(f"%{commodity.strip()}%")
 
-        cur = con.execute("""
-            UPDATE prices
-            SET source_type = 'Verified'
-            WHERE id = %s
-              AND in_store_confirmed = TRUE
-        """, (price_id,))
+    query += " ORDER BY source_date DESC NULLS LAST LIMIT %s"
+    params.append(limit)
 
-        if cur.rowcount == 0:
-            raise HTTPException(
-                404,
-                "Price not found"
-            )
+    return fetch_all(query, params)
 
-        con.commit()
-
-    return {
-        "ok": True,
-        "price_id": price_id,
-        "status": "Verified"
-    }
-
-
-# ---------------------------------------------------------
-# ADMIN MANUAL GOVERNMENT DATA REFRESH
-# ---------------------------------------------------------
-
-@app.post("/api/admin/refresh")
-async def admin_refresh(
-    x_admin_token: str = Header(default="")
-):
-
-    if not ADMIN_TOKEN or x_admin_token != ADMIN_TOKEN:
-        raise HTTPException(
-            401,
-            "Invalid ADMIN_TOKEN"
-        )
-
-    results = {}
-
-    for key, fn in (
-        ("agmarknet", fetch_agmarknet),
-        ("consumer_affairs", fetch_consumer_affairs)
-    ):
-
-        try:
-
-            saved = await asyncio.to_thread(fn)
-
-            results[key] = {
-                "ok": True,
-                "saved": saved
-            }
-
-        except Exception as exc:
-
-            mark_sync(
-                key,
-                False,
-                str(exc)
-            )
-
-            results[key] = {
-                "ok": False,
-                "error": str(exc)
-            }
-
-    return results
-
-
-# ---------------------------------------------------------
-# ADMIN ADD OFFER
-# ---------------------------------------------------------
-
-@app.post("/api/admin/offers")
-def admin_add_offer(
-    payload: dict,
-    x_admin_token: str = Header(default="")
-):
-
-    if not ADMIN_TOKEN or x_admin_token != ADMIN_TOKEN:
-        raise HTTPException(
-            401,
-            "Invalid ADMIN_TOKEN"
-        )
-
-    title = str(
-        payload.get("title") or ""
-    ).strip()
-
-    if not title:
-        raise HTTPException(
-            400,
-            "Offer title is required"
-        )
-
-    shop_id = payload.get("shop_id")
-
-    try:
-        shop_id = (
-            int(shop_id)
-            if shop_id not in (None, "")
-            else None
-        )
-
-    except (TypeError, ValueError):
-        raise HTTPException(
-            400,
-            "shop_id must be numeric"
-        )
-
-    with db() as con:
-
-        if shop_id is not None:
-
-            shop = con.execute("""
-                SELECT id
-                FROM shops
-                WHERE id = %s
-            """, (shop_id,)).fetchone()
-
-            if not shop:
-                raise HTTPException(
-                    404,
-                    "Shop not found"
-                )
-
-        valid_until = payload.get("valid_until") or None
-
-        row = con.execute("""
-            INSERT INTO offers (
-                shop_id,
-                title,
-                description,
-                discount_text,
-                valid_from,
-                valid_until,
-                is_active,
-                updated_at
-            )
-            VALUES (
-                %s, %s, %s, %s,
-                NOW(), %s, TRUE, NOW()
-            )
-            RETURNING id
-        """, (
-            shop_id,
-            title,
-            str(payload.get("description") or ""),
-            str(payload.get("discount_text") or ""),
-            valid_until
-        )).fetchone()
-
-        con.commit()
-
-    return {
-        "ok": True,
-        "offer_id": row["id"]
-    }
-
-
-# ---------------------------------------------------------
-# OFFICIAL DATA SOURCES
-# ---------------------------------------------------------
 
 @app.get("/api/official-sources")
 def official_sources():
-
     return {
         "sources": [
-
             {
-                "name": "AGMARKNET / data.gov.in",
+                "name": "AGMARKNET",
                 "type": "Wholesale mandi prices",
-                "automatic": bool(DATA_GOV_IN_API_KEY),
-                "scope": "NTR / Krishna records returned by the API",
-                "note": (
-                    "Wholesale mandi prices; usually ₹ per quintal, "
-                    "not retail shop prices."
-                ),
-                "url": AGMARKNET_URL
+                "note": "Not the same as prices in Vijayawada retail shops"
             },
-
             {
                 "name": "Department of Consumer Affairs",
-                "type": "Daily retail benchmark",
-                "automatic": True,
-                "scope": "All-India average",
-                "note": (
-                    "National benchmark only; "
-                    "not Vijayawada-specific."
-                ),
-                "url": CONSUMER_AFFAIRS_URL
+                "type": "Government retail benchmark",
+                "note": "Reference benchmark; not a branch-specific shop quote"
             },
-
             {
-                "name": "Local supermarkets and shops",
-                "type": "Local retail",
-                "automatic": False,
-                "scope": "Shop-specific",
-                "note": (
-                    "Requires owner-confirmed or "
-                    "independently verified submissions."
-                )
-            },
-
-            {
-                "name": "Rythu Bazaar",
-                "type": "Local retail",
-                "automatic": False,
-                "scope": "Bazaar-specific",
-                "note": (
-                    "No verified public automatic feed configured; "
-                    "do not substitute mandi prices."
-                )
+                "name": "Vijayawada physical shops",
+                "type": "Local shop prices",
+                "note": "Shown only when submitted and confirmed through the website workflow"
             }
         ]
     }
+
+
+# --------------------------------------------------
+# 14. REQUEST MODELS
+# --------------------------------------------------
+
+class PriceUpdateRequest(BaseModel):
+    shop_name: str = Field(min_length=2, max_length=200)
+    product_id: int
+    price: Decimal
+    unit: str = Field(min_length=1, max_length=50)
+    ward_id: int | None = None
+    locality_id: int | None = None
+    submitted_by: str | None = None
+    evidence_url: str | None = None
+
+
+class OfferRequest(BaseModel):
+    shop_id: int
+    title: str = Field(min_length=2, max_length=250)
+    description: str | None = None
+    discount_text: str | None = None
+    product_id: int | None = None
+    offer_type: str | None = None
+    terms_conditions: str | None = None
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+
+
+# --------------------------------------------------
+# 15. SHOP OWNER PRICE SUBMISSION
+# --------------------------------------------------
+
+@app.post("/api/shop/price-update")
+def submit_shop_price(
+    data: PriceUpdateRequest,
+    x_shop_owner_token: str | None = Header(default=None)
+):
+    require_owner_token(x_shop_owner_token)
+
+    price = valid_price(data.price)
+    product = verify_product_exists(data.product_id)
+
+    # Match only a single existing shop.
+    # Branches with different localities must not be merged.
+    query = """
+        SELECT id, shop_name, ward_id, locality_id
+        FROM shops
+        WHERE LOWER(shop_name) = LOWER(%s)
+          AND COALESCE(is_active, TRUE) = TRUE
+    """
+    params = [data.shop_name.strip()]
+
+    if data.ward_id is not None:
+        query += " AND (ward_id = %s OR ward_id IS NULL)"
+        params.append(data.ward_id)
+
+    if data.locality_id is not None:
+        query += " AND (locality_id = %s OR locality_id IS NULL)"
+        params.append(data.locality_id)
+
+    query += """
+        ORDER BY
+            CASE WHEN ward_id = %s THEN 0 ELSE 1 END,
+            CASE WHEN locality_id = %s THEN 0 ELSE 1 END
+        LIMIT 2
+    """
+    params.extend([data.ward_id, data.locality_id])
+
+    matches = fetch_all(query, params)
+
+    if len(matches) == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Shop not found. Register the shop before submitting prices."
+        )
+
+    if len(matches) > 1:
+        raise HTTPException(
+            status_code=409,
+            detail="Multiple shop branches found. Contact admin to select the correct branch."
+        )
+
+    shop = matches[0]
+
+    if data.ward_id is not None and shop["ward_id"] is not None:
+        if shop["ward_id"] != data.ward_id:
+            raise HTTPException(status_code=400, detail="Shop ward mismatch")
+
+    if data.locality_id is not None and shop["locality_id"] is not None:
+        if shop["locality_id"] != data.locality_id:
+            raise HTTPException(status_code=400, detail="Shop locality mismatch")
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO price_submissions (
+                    shop_id,
+                    product_id,
+                    submitted_price,
+                    unit,
+                    submitted_by,
+                    evidence_url,
+                    status,
+                    submitted_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, 'pending', NOW())
+                RETURNING id
+                """,
+                (
+                    shop["id"],
+                    data.product_id,
+                    price,
+                    data.unit.strip(),
+                    clean_text(data.submitted_by, 150),
+                    clean_text(data.evidence_url, 1000)
+                )
+            )
+
+            submission = cur.fetchone()
+
+            cur.execute(
+                """
+                INSERT INTO shop_update_logs (
+                    shop_id,
+                    action_type,
+                    description,
+                    submitted_by
+                )
+                VALUES (%s, 'PRICE_SUBMITTED', %s, %s)
+                """,
+                (
+                    shop["id"],
+                    f"Price submission for {product['product_name']}",
+                    clean_text(data.submitted_by, 150)
+                )
+            )
+
+    return {
+        "success": True,
+        "message": "Price submitted for admin verification",
+        "submission_id": submission["id"],
+        "status": "pending"
+    }
+
+
+# --------------------------------------------------
+# 16. ADMIN: VIEW PENDING PRICE SUBMISSIONS
+# --------------------------------------------------
+
+@app.get("/api/admin/price-submissions")
+def admin_price_submissions(
+    x_admin_token: str | None = Header(default=None),
+    status: str = "pending"
+):
+    require_admin(x_admin_token)
+
+    if status not in ("pending", "approved", "rejected"):
+        raise HTTPException(status_code=400, detail="Invalid status")
+
+    return fetch_all(
+        """
+        SELECT
+            ps.id,
+            ps.shop_id,
+            s.shop_name,
+            s.category AS shop_category,
+            s.address,
+            ps.product_id,
+            p.product_name,
+            ps.submitted_price,
+            ps.unit,
+            ps.submitted_by,
+            ps.evidence_url,
+            ps.status,
+            ps.admin_note,
+            ps.submitted_at
+        FROM price_submissions ps
+        JOIN shops s ON s.id = ps.shop_id
+        JOIN products p ON p.id = ps.product_id
+        WHERE ps.status = %s
+        ORDER BY ps.submitted_at DESC
+        """,
+        (status,)
+    )
+
+
+# --------------------------------------------------
+# 17. ADMIN: APPROVE OR REJECT PRICE
+# --------------------------------------------------
+
+@app.post("/api/admin/price-submissions/{submission_id}/approve")
+def approve_price_submission(
+    submission_id: int,
+    x_admin_token: str | None = Header(default=None)
+):
+    require_admin(x_admin_token)
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+
+            cur.execute(
+                """
+                SELECT
+                    ps.*,
+                    p.product_name,
+                    s.shop_name
+                FROM price_submissions ps
+                JOIN products p ON p.id = ps.product_id
+                JOIN shops s ON s.id = ps.shop_id
+                WHERE ps.id = %s
+                FOR UPDATE OF ps
+                """,
+                (submission_id,)
+            )
+
+            submission = cur.fetchone()
+
+            if not submission:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Submission not found"
+                )
+
+            if submission["status"] != "pending":
+                raise HTTPException(
+                    status_code=409,
+                    detail="This submission has already been reviewed"
+                )
+
+            # Lock matching current-price rows to prevent simultaneous
+            # approvals from creating competing current prices.
+            cur.execute(
+                """
+                SELECT id, price
+                FROM prices
+                WHERE shop_id = %s
+                  AND product_id = %s
+                  AND in_store_confirmed = TRUE
+                  AND (valid_until IS NULL OR valid_until > NOW())
+                ORDER BY updated_at DESC NULLS LAST, id DESC
+                FOR UPDATE
+                """,
+                (submission["shop_id"], submission["product_id"])
+            )
+
+            old_rows = cur.fetchall()
+            old_price = old_rows[0]["price"] if old_rows else None
+
+            # Expire existing confirmed prices for this shop/product.
+            cur.execute(
+                """
+                UPDATE prices
+                SET valid_until = NOW(),
+                    updated_at = NOW()
+                WHERE shop_id = %s
+                  AND product_id = %s
+                  AND in_store_confirmed = TRUE
+                  AND (valid_until IS NULL OR valid_until > NOW())
+                """,
+                (submission["shop_id"], submission["product_id"])
+            )
+
+            # Insert the newly approved price.
+            cur.execute(
+                """
+                INSERT INTO prices (
+                    shop_id,
+                    product_id,
+                    price,
+                    price_type,
+                    source_name,
+                    updated_at,
+                    source_type,
+                    is_live,
+                    in_store_confirmed,
+                    valid_until
+                )
+                VALUES (
+                    %s, %s, %s,
+                    'Retail',
+                    'BezawadaDeals Admin Verification',
+                    NOW(),
+                    'Verified',
+                    TRUE,
+                    TRUE,
+                    NOW() + INTERVAL '24 hours'
+                )
+                RETURNING id
+                """,
+                (
+                    submission["shop_id"],
+                    submission["product_id"],
+                    submission["submitted_price"]
+                )
+            )
+
+            new_price_row = cur.fetchone()
+
+            cur.execute(
+                """
+                INSERT INTO price_history (
+                    shop_id,
+                    product_id,
+                    old_price,
+                    new_price,
+                    unit,
+                    source_type,
+                    changed_at
+                )
+                VALUES (%s, %s, %s, %s, %s, 'Admin Verified', NOW())
+                """,
+                (
+                    submission["shop_id"],
+                    submission["product_id"],
+                    old_price,
+                    submission["submitted_price"],
+                    submission["unit"]
+                )
+            )
+
+            cur.execute(
+                """
+                UPDATE price_submissions
+                SET status = 'approved',
+                    reviewed_at = NOW(),
+                    reviewed_by = 'admin'
+                WHERE id = %s
+                """,
+                (submission_id,)
+            )
+
+            cur.execute(
+                """
+                INSERT INTO shop_update_logs (
+                    shop_id,
+                    action_type,
+                    description,
+                    submitted_by
+                )
+                VALUES (%s, 'PRICE_APPROVED', %s, 'admin')
+                """,
+                (
+                    submission["shop_id"],
+                    f"Approved price for {submission['product_name']}"
+                )
+            )
+
+    return {
+        "success": True,
+        "message": "Price approved and published",
+        "price_id": new_price_row["id"],
+        "valid_for_hours": 24
+    }
+
+
+@app.post("/api/admin/price-submissions/{submission_id}/reject")
+def reject_price_submission(
+    submission_id: int,
+    note: str = Query(default="Rejected by admin"),
+    x_admin_token: str | None = Header(default=None)
+):
+    require_admin(x_admin_token)
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE price_submissions
+                SET status = 'rejected',
+                    admin_note = %s,
+                    reviewed_at = NOW(),
+                    reviewed_by = 'admin'
+                WHERE id = %s
+                  AND status = 'pending'
+                RETURNING id, shop_id
+                """,
+                (clean_text(note, 1000), submission_id)
+            )
+
+            result = cur.fetchone()
+
+            if not result:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Pending submission not found"
+                )
+
+            cur.execute(
+                """
+                INSERT INTO shop_update_logs (
+                    shop_id,
+                    action_type,
+                    description,
+                    submitted_by
+                )
+                VALUES (%s, 'PRICE_REJECTED', %s, 'admin')
+                """,
+                (
+                    result["shop_id"],
+                    clean_text(note, 1000)
+                )
+            )
+
+    return {
+        "success": True,
+        "message": "Price submission rejected"
+    }
+
+
+# --------------------------------------------------
+# 18. LEGACY ADMIN PRICE VERIFICATION
+# --------------------------------------------------
+
+@app.post("/api/admin/prices/{price_id}/verify")
+def verify_existing_price(
+    price_id: int,
+    x_admin_token: str | None = Header(default=None)
+):
+    require_admin(x_admin_token)
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE prices
+                SET source_type = 'Verified',
+                    in_store_confirmed = TRUE,
+                    is_live = TRUE,
+                    updated_at = NOW(),
+                    valid_until = NOW() + INTERVAL '24 hours'
+                WHERE id = %s
+                  AND price > 0
+                RETURNING id, shop_id, product_id, price
+                """,
+                (price_id,)
+            )
+
+            result = cur.fetchone()
+
+            if not result:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Price not found"
+                )
+
+    return {
+        "success": True,
+        "message": "Existing price verified",
+        "price_id": result["id"]
+    }
+
+
+# --------------------------------------------------
+# 19. ADMIN: ADD OFFER
+# --------------------------------------------------
+
+@app.post("/api/admin/offers")
+def admin_add_offer(
+    data: OfferRequest,
+    x_admin_token: str | None = Header(default=None)
+):
+    require_admin(x_admin_token)
+
+    verify_shop_exists(data.shop_id)
+
+    if data.product_id is not None:
+        verify_product_exists(data.product_id)
+
+    if (
+        data.valid_from is not None
+        and data.valid_until is not None
+        and data.valid_until <= data.valid_from
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Offer end time must be after start time"
+        )
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO offers (
+                    shop_id,
+                    title,
+                    description,
+                    discount_text,
+                    valid_from,
+                    valid_until,
+                    is_active,
+                    updated_at,
+                    product_id,
+                    offer_type,
+                    terms_conditions,
+                    source_type,
+                    is_verified
+                )
+                VALUES (
+                    %s, %s, %s, %s, %s, %s,
+                    TRUE, NOW(), %s, %s, %s,
+                    'Admin Added', TRUE
+                )
+                RETURNING id
+                """,
+                (
+                    data.shop_id,
+                    data.title.strip(),
+                    clean_text(data.description, 2000),
+                    clean_text(data.discount_text, 500),
+                    data.valid_from,
+                    data.valid_until,
+                    data.product_id,
+                    clean_text(data.offer_type, 100),
+                    clean_text(data.terms_conditions, 2000)
+                )
+            )
+
+            result = cur.fetchone()
+
+    return {
+        "success": True,
+        "offer_id": result["id"],
+        "message": "Offer added"
+    }
+
+
+# --------------------------------------------------
+# 20. ADMIN: REFRESH STATUS
+# --------------------------------------------------
+
+@app.post("/api/admin/refresh")
+def admin_refresh(
+    x_admin_token: str | None = Header(default=None)
+):
+    require_admin(x_admin_token)
+
+    # This endpoint does not fabricate or import market data.
+    # Government-source sync can be connected separately.
+    return {
+        "success": True,
+        "message": "Refresh request received. No external data was imported.",
+        "timestamp": now_utc()
+    }
+
+
+# --------------------------------------------------
+# 21. PRICE HISTORY API
+# --------------------------------------------------
+
+@app.get("/api/price-history")
+def get_price_history(
+    product_id: int,
+    shop_id: int | None = None,
+    limit: int = Query(default=100, ge=1, le=500)
+):
+    query = """
+        SELECT
+            ph.id,
+            ph.shop_id,
+            s.shop_name,
+            ph.product_id,
+            p.product_name,
+            ph.old_price,
+            ph.new_price,
+            ph.unit,
+            ph.source_type,
+            ph.changed_at
+        FROM price_history ph
+        JOIN shops s ON s.id = ph.shop_id
+        JOIN products p ON p.id = ph.product_id
+        WHERE ph.product_id = %s
+    """
+
+    params = [product_id]
+
+    if shop_id is not None:
+        query += " AND ph.shop_id = %s"
+        params.append(shop_id)
+
+    query += " ORDER BY ph.changed_at DESC LIMIT %s"
+    params.append(limit)
+
+    return fetch_all(query, params)
+
+
+# --------------------------------------------------
+# 22. HOME PAGE
+# --------------------------------------------------
+
+@app.get("/", response_class=HTMLResponse)
+def home():
+    index_path = os.path.join(os.path.dirname(__file__), "index.html")
+
+    if os.path.isfile(index_path):
+        with open(index_path, "r", encoding="utf-8") as file:
+            return HTMLResponse(file.read())
+
+    return HTMLResponse(
+        """
+        <!doctype html>
+        <html>
+        <head>
+            <title>BezawadaDeals</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+        </head>
+        <body>
+            <h1>BezawadaDeals API is running</h1>
+            <p>Frontend index.html was not found.</p>
+            <p><a href="/docs">Open API documentation</a></p>
+        </body>
+        </html>
+        """
+    )
+
+
+# --------------------------------------------------
+# 23. ROOT API INFORMATION
+# --------------------------------------------------
+
+@app.get("/api")
+def api_home():
+    return {
+        "name": "BezawadaDeals",
+        "version": APP_VERSION,
+        "status": "running",
+        "docs": "/docs",
+        "health": "/health"
+    }
+
