@@ -1,45 +1,657 @@
-<!doctype html><html lang="te"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<!doctype html>
+<html lang="te">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BezawadaDeals | Vijayawada Price Tracker</title>
+
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f3f6fa;color:#172033}.hero{background:#102b50;color:white;padding:24px 16px}.wrap{max-width:1180px;margin:auto;padding:14px}.hero h1{margin:0 0 6px}.muted{color:#6b778c;font-size:12px}.hero .muted{color:#d7e2f2}.stats,.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.card,.panel{background:white;border:1px solid #e0e6ef;border-radius:13px;padding:14px}.panel{margin:13px 0}.stats b{display:block;font-size:22px;margin-top:5px}.panel h2{font-size:18px;margin:0 0 12px}.filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}label{font-size:12px;font-weight:bold;display:block;margin-bottom:5px;color:#43516a}input,select,button{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;background:white;font:inherit}button{background:#145ba8;color:white;border:0;font-weight:bold;cursor:pointer}.notice{background:#fff8e7;padding:11px;border:1px solid #efdfa9;border-radius:8px;font-size:13px}.item{display:grid;grid-template-columns:1fr 1.4fr auto;gap:10px;padding:12px 0;border-top:1px solid #edf0f4;align-items:center}.price{font-size:18px;font-weight:bold;text-align:right;white-space:nowrap}.empty{background:#f6f8fb;padding:13px;border-radius:8px;color:#59677a;font-size:13px}.pill{font-size:11px;background:#e8f1ff;color:#174d89;padding:4px 7px;border-radius:20px}.field{min-width:0}@media(max-width:700px){.stats{grid-template-columns:repeat(2,1fr)}.filters,.grid{grid-template-columns:repeat(2,1fr)}.item{grid-template-columns:1fr auto}.detail{grid-column:1/-1;grid-row:2}.price{grid-column:2;grid-row:1/3}}@media(max-width:420px){.filters,.grid{grid-template-columns:1fr}}
-</style></head><body>
-<header class="hero"><div class="wrap"><h1>BezawadaDeals</h1><div class="muted">విజయవాడ • అన్ని categories • Local shops • Verified price tracker</div><div class="stats" style="margin-top:15px"><div class="card"><span class="muted">Categories</span><b id="catCount">—</b></div><div class="card"><span class="muted">Wards</span><b id="wardCount">—</b></div><div class="card"><span class="muted">Current prices</span><b id="priceCount">0</b></div><div class="card"><span class="muted">Last updated</span><b id="lastRefresh" style="font-size:14px">—</b></div></div></div></header>
-<main class="wrap">
-<section class="panel"><h2>అన్ని Categories – Price Tracker</h2><div class="notice">ధరలు షాప్ యజమానులు submit చేసి admin approve చేసిన తర్వాతే ఇక్కడ కనిపిస్తాయి. లేని ధరలను ఊహించి చూపించము.</div>
-<div class="filters" style="margin-top:12px"><div><label>Category</label><select id="category"><option value="">All categories</option></select></div><div><label>Ward</label><select id="ward"><option value="">All wards</option></select></div><div><label>Locality</label><select id="area"><option value="">All localities</option></select></div><div><label>Sort prices</label><select id="sort"><option value="low">Low to high</option><option value="high">High to low</option></select></div><div><label>Product search</label><input id="product" placeholder="Tomato, rice, oil..."></div><div><label>Shop type</label><input id="source" placeholder="Supermarket / Local shop"></div><div><label>Expired records</label><select id="expiry"><option value="false">Hide expired</option><option value="true">Include expired</option></select></div><div style="align-self:end"><button id="refresh">Refresh prices</button></div></div><div id="retailResults" class="empty" style="margin-top:12px">Loading...</div></section>
-<section class="panel"><h2>Government retail benchmark</h2><div class="muted">ప్రభుత్వ benchmark ధరలు; local shop price కాదు.</div><div id="govtResults" class="empty">Loading...</div></section>
-<section class="panel"><h2>AGMARKNET wholesale mandi prices</h2><div class="muted">మార్కెట్ wholesale ధరలు; retail ధరలు కావు.</div><div id="mandiResults" class="empty">Loading...</div></section>
-<section class="panel"><h2>Vijayawada wards & localities</h2><div id="wardResults" class="empty">Loading...</div></section>
-<section class="panel"><h2>Registered shops</h2><div id="shopResults" class="empty">Loading...</div></section>
-<section class="panel"><h2>Current offers</h2><div id="offerResults" class="empty">Loading...</div></section>
-<section class="panel"><h2>Shop owner – Submit price</h2><div class="grid">
-<div><label>Owner token</label><input id="ownerToken" type="password"></div><div><label>Shop name</label><input id="shopName"></div><div><label>Shop type</label><input id="shopType" placeholder="Local shop / Supermarket"></div><div><label>Locality</label><input id="shopArea"></div><div><label>Ward number</label><input id="shopWard" type="number" min="1" max="86"></div><div><label>Product</label><input id="shopProduct"></div><div><label>Product category</label><select id="shopCategory"></select></div><div><label>Unit</label><input id="shopUnit" value="1 kg"></div><div><label>Price ₹</label><input id="shopPrice" type="number" min=".01" step=".01"></div><div><label>Address</label><input id="shopAddress"></div><div><label>Phone</label><input id="shopPhone"></div></div>
-<p><label style="font-weight:normal"><input id="confirmed" type="checkbox" style="width:auto"> ప్రస్తుత అమ్మకపు ధర అని నిర్ధారిస్తున్నాను.</label></p><button id="submitPrice">Submit for admin approval</button><p id="submitMsg" class="muted"></p></section>
-<section class="panel"><h2>System status</h2><div id="status" class="muted">Loading...</div></section><p class="muted" style="text-align:center">BezawadaDeals • Existing database records retained</p></main>
-<script>
-const $=id=>document.getElementById(id), esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-async function api(url,opt={}){let r=await fetch(url,{cache:"no-store",...opt}),d=await r.json().catch(()=>({detail:r.statusText}));if(!r.ok)throw Error(d.detail||r.statusText);return d}
-function fail(id,e){$(id).innerHTML='<div class="empty">Load error: '+esc(e.message)+'</div>'}
-let categories=[],wards=[],localities=[];
-async function init(){
- try{
- const [c,w,l]=await Promise.all([api("/api/categories"),api("/api/wards"),api("/api/localities")]);categories=c.categories||[];wards=w.wards||[];localities=l.localities||[];
- $("catCount").textContent=categories.length;$("wardCount").textContent=wards.length;
- categories.forEach(x=>{$("category").add(new Option(x,x));$("shopCategory").add(new Option(x,x))});
- wards.forEach(x=>$("ward").add(new Option("Ward "+x.ward_number+" — "+x.ward_name,x.ward_number)));
- localities.forEach(x=>$("area").add(new Option(x.name+" — Ward "+(x.ward_number??"—"),x.name)));
- $("wardResults").innerHTML=wards.map(x=>`<div class="item"><b>Ward ${esc(x.ward_number)} — ${esc(x.ward_name)}</b><div class="detail muted">${esc(x.area_name||"Area not recorded")}<br>N: ${esc(x.north_boundary||"Not recorded")} | E: ${esc(x.east_boundary||"Not recorded")}<br>S: ${esc(x.south_boundary||"Not recorded")} | W: ${esc(x.west_boundary||"Not recorded")}<br>Source: ${esc(x.boundary_source||"Not entered")}</div></div>`).join("")||"No wards found";
- }catch(e){fail("wardResults",e)}
- await loadAll();
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f6fa;color:#172033}
+.hero{background:#102b50;color:white;padding:24px 16px}
+.wrap{max-width:1180px;margin:auto;padding:14px}
+.hero h1{margin:0 0 6px}
+.muted{color:#6b778c;font-size:12px}
+.hero .muted{color:#d7e2f2}
+.stats,.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.card,.panel{background:white;border:1px solid #e0e6ef;border-radius:13px;padding:14px}
+.panel{margin:13px 0}
+.stats b{display:block;font-size:22px;margin-top:5px}
+.panel h2{font-size:18px;margin:0 0 12px}
+.filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+label{font-size:12px;font-weight:bold;display:block;margin-bottom:5px;color:#43516a}
+input,select,button{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;background:white;font:inherit}
+button{background:#145ba8;color:white;border:0;font-weight:bold;cursor:pointer}
+.notice{background:#fff8e7;padding:11px;border:1px solid #efdfa9;border-radius:8px;font-size:13px}
+.item{display:grid;grid-template-columns:1fr 1.4fr auto;gap:10px;padding:12px 0;border-top:1px solid #edf0f4;align-items:center}
+.price{font-size:18px;font-weight:bold;text-align:right;white-space:nowrap}
+.empty{background:#f6f8fb;padding:13px;border-radius:8px;color:#59677a;font-size:13px}
+.pill{font-size:11px;background:#e8f1ff;color:#174d89;padding:4px 7px;border-radius:20px}
+.field{min-width:0}
+
+@media(max-width:700px){
+.stats{grid-template-columns:repeat(2,1fr)}
+.filters,.grid{grid-template-columns:repeat(2,1fr)}
+.item{grid-template-columns:1fr auto}
+.detail{grid-column:1/-1;grid-row:2}
+.price{grid-column:2;grid-row:1/3}
 }
-function params(){let p=new URLSearchParams();for(let [k,id] of [["category","category"],["ward_number","ward"],["area","area"],["product","product"],["source_type","source"],["sort","sort"],["include_expired","expiry"]])if($(id).value)p.set(k,$(id).value);return p.toString()}
-async function retail(){try{let d=await api("/api/unified-price-tracker?"+params());$("priceCount").textContent=d.count;$("retailResults").innerHTML=d.count?d.prices.map(x=>`<div class="item"><div><b>${esc(x.product)}</b><div class="muted">${esc(x.product_category)} • ${esc(x.unit)}</div></div><div class="detail"><b>${esc(x.shop)}</b><div class="muted">${esc(x.shop_type)} • ${esc(x.area)} • Ward ${esc(x.ward_number)}</div><div class="muted">${esc(x.source)} • ${x.observed_at?new Date(x.observed_at).toLocaleString():""}</div></div><div class="price">₹${Number(x.price).toFixed(2)}<div><span class="pill">${esc(x.status)}</span></div></div></div>`).join(""):"<div class='empty'>ఈ filterకి ప్రస్తుతం approved shop prices లేవు.</div>"}catch(e){fail("retailResults",e)}}
-async function govt(){try{let d=await api("/api/official-retail-prices");$("govtResults").innerHTML=d.count?d.prices.map(x=>`<div class="item"><b>${esc(x.commodity)}<div class="muted">${esc(x.unit)}</div></b><div class="detail muted">${esc(x.geographic_scope)} • ${esc(x.report_date||"")}</div><div class="price">₹${Number(x.price).toFixed(2)}</div></div>`).join(""):"<div class='empty'>Government benchmark data not synced.</div>"}catch(e){fail("govtResults",e)}}
-async function mandi(){try{let d=await api("/api/market-prices");$("mandiResults").innerHTML=d.count?d.prices.map(x=>`<div class="item"><b>${esc(x.commodity)}<div class="muted">${esc(x.variety||"")} • ${esc(x.grade||"")}</div></b><div class="detail muted">${esc(x.market)} • ${esc(x.district)} • ${esc(x.arrival_date||"")}</div><div class="price">₹${x.modal_price??"—"}<div class="muted">per quintal</div></div></div>`).join(""):"<div class='empty'>Mandi data not synced.</div>"}catch(e){fail("mandiResults",e)}}
-async function shops(){try{let d=await api("/api/shops");$("shopResults").innerHTML=d.count?d.shops.map(x=>`<div class="item"><b>${esc(x.name)}<div class="muted">${esc(x.category)}</div></b><div class="detail muted">${esc(x.area)} • Ward ${esc(x.ward_number)}<br>${esc(x.address)}</div><div class="muted">${esc(x.phone||"")}<br>${x.is_verified?"Verified":"Unverified"}</div></div>`).join(""):"<div class='empty'>No shops registered yet.</div>"}catch(e){fail("shopResults",e)}}
-async function offers(){try{let d=await api("/api/offers");$("offerResults").innerHTML=d.count?d.offers.map(x=>`<div class="item"><b>${esc(x.title)}<div class="muted">${esc(x.description||"")} ${esc(x.discount_text||"")}</div></b><div class="detail muted">${esc(x.shop)} • ${esc(x.area)} • Ward ${esc(x.ward_number)}</div><div class="muted">${x.valid_until?"Until "+new Date(x.valid_until).toLocaleString():"No expiry"}</div></div>`).join(""):"<div class='empty'>No active offers.</div>"}catch(e){fail("offerResults",e)}}
-async function status(){try{let [s,src]=await Promise.all([api("/api/status"),api("/api/official-sources")]);$("status").innerHTML="<b>Database:</b> "+Object.entries(s.counts||{}).map(([k,v])=>esc(k)+": "+v).join(" • ")+src.sources.map(x=>`<p><b>${esc(x.name)}</b> — ${esc(x.note)} <br>Automatic: ${x.automatic?"Configured":"Not configured"}</p>`).join("")+(s.sources||[]).map(x=>`<p>${esc(x.source_key)}: ${esc(x.status)} • ${esc(x.last_success||"Never")}</p>`).join("")}catch(e){fail("status",e)}}
-async function loadAll(){await Promise.all([retail(),govt(),mandi(),shops(),offers(),status()]);$("lastRefresh").textContent=new Date().toLocaleTimeString()}
-async function submit(){let m=$("submitMsg");m.textContent="Submitting...";let body={shop_name:$("shopName").value.trim(),shop_type:$("shopType").value.trim(),area:$("shopArea").value.trim(),ward_number:Number($("shopWard").value),product:$("shopProduct").value.trim(),category:$("shopCategory").value,unit:$("shopUnit").value.trim(),price:Number($("shopPrice").value),address:$("shopAddress").value.trim(),phone:$("shopPhone").value.trim(),confirmed:$("confirmed").checked};try{let d=await api("/api/shop/price-update",{method:"POST",headers:{"Content-Type":"application/json","X-Shop-Token":$("ownerToken").value},body:JSON.stringify(body)});m.textContent=d.message}catch(e){m.textContent="Error: "+e.message}}
-$("refresh").onclick=loadAll;$("submitPrice").onclick=submit;["category","ward","area","sort","expiry"].forEach(id=>$(id).onchange=retail);["product","source"].forEach(id=>$(id).oninput=()=>{clearTimeout(window.st);window.st=setTimeout(retail,300)});init();setInterval(loadAll,300000);
-</script></body></html>
+@media(max-width:420px){
+.filters,.grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+
+<body>
+
+<header class="hero">
+<div class="wrap">
+<h1>BezawadaDeals</h1>
+<div class="muted">విజయవాడ • అన్ని categories • Local shops • Verified price tracker</div>
+
+<div class="stats" style="margin-top:15px">
+<div class="card">
+<span class="muted">Categories</span>
+<b id="catCount">—</b>
+</div>
+<div class="card">
+<span class="muted">Wards</span>
+<b id="wardCount">—</b>
+</div>
+<div class="card">
+<span class="muted">Current prices</span>
+<b id="priceCount">0</b>
+</div>
+<div class="card">
+<span class="muted">Last updated</span>
+<b id="lastRefresh" style="font-size:14px">—</b>
+</div>
+</div>
+</div>
+</header>
+
+<main class="wrap">
+
+<section class="panel">
+<h2>అన్ని Categories – Price Tracker</h2>
+
+<div class="notice">
+ధరలు షాప్ యజమానులు submit చేసి admin approve చేసిన తర్వాతే ఇక్కడ కనిపిస్తాయి.
+లేని ధరలను ఊహించి చూపించము.
+</div>
+
+<div class="filters" style="margin-top:12px">
+
+<div>
+<label>Category</label>
+<select id="category">
+<option value="">All categories</option>
+</select>
+</div>
+
+<div>
+<label>Ward</label>
+<select id="ward">
+<option value="">All wards</option>
+</select>
+</div>
+
+<div>
+<label>Locality</label>
+<select id="area">
+<option value="">All localities</option>
+</select>
+</div>
+
+<div>
+<label>Sort prices</label>
+<select id="sort">
+<option value="low">Low to high</option>
+<option value="high">High to low</option>
+</select>
+</div>
+
+<div>
+<label>Product search</label>
+<input id="product" placeholder="Tomato, rice, oil...">
+</div>
+
+<div>
+<label>Shop type</label>
+<input id="source" placeholder="Supermarket / Local shop">
+</div>
+
+<div>
+<label>Expired records</label>
+<select id="expiry">
+<option value="false">Hide expired</option>
+<option value="true">Include expired</option>
+</select>
+</div>
+
+<div style="align-self:end">
+<button id="refresh">Refresh prices</button>
+</div>
+
+</div>
+
+<div id="retailResults" class="empty" style="margin-top:12px">
+Loading...
+</div>
+</section>
+
+<section class="panel">
+<h2>Government retail benchmark</h2>
+<div class="muted">ప్రభుత్వ benchmark ధరలు; local shop price కాదు.</div>
+<div id="govtResults" class="empty">Loading...</div>
+</section>
+
+<section class="panel">
+<h2>AGMARKNET wholesale mandi prices</h2>
+<div class="muted">మార్కెట్ wholesale ధరలు; retail ధరలు కావు.</div>
+<div id="mandiResults" class="empty">Loading...</div>
+</section>
+
+<section class="panel">
+<h2>Vijayawada wards & localities</h2>
+<div id="wardResults" class="empty">Loading...</div>
+</section>
+
+<section class="panel">
+<h2>Registered shops</h2>
+<div id="shopResults" class="empty">Loading...</div>
+</section>
+
+<section class="panel">
+<h2>Current offers</h2>
+<div id="offerResults" class="empty">Loading...</div>
+</section>
+
+<section class="panel">
+<h2>Shop owner – Submit price</h2>
+
+<div class="grid">
+
+<div>
+<label>Owner token</label>
+<input id="ownerToken" type="password">
+</div>
+
+<div>
+<label>Shop name</label>
+<input id="shopName">
+</div>
+
+<div>
+<label>Shop type</label>
+<input id="shopType" placeholder="Local shop / Supermarket">
+</div>
+
+<div>
+<label>Locality</label>
+<input id="shopArea">
+</div>
+
+<div>
+<label>Ward number</label>
+<input id="shopWard" type="number" min="1" max="86">
+</div>
+
+<div>
+<label>Product</label>
+<input id="shopProduct">
+</div>
+
+<div>
+<label>Product category</label>
+<select id="shopCategory"></select>
+</div>
+
+<div>
+<label>Unit</label>
+<input id="shopUnit" value="1 kg">
+</div>
+
+<div>
+<label>Price ₹</label>
+<input id="shopPrice" type="number" min=".01" step=".01">
+</div>
+
+<div>
+<label>Address</label>
+<input id="shopAddress">
+</div>
+
+<div>
+<label>Phone</label>
+<input id="shopPhone">
+</div>
+
+</div>
+
+<p>
+<label style="font-weight:normal">
+<input id="confirmed" type="checkbox" style="width:auto">
+ప్రస్తుత అమ్మకపు ధర అని నిర్ధారిస్తున్నాను.
+</label>
+</p>
+
+<button id="submitPrice">Submit for admin approval</button>
+<p id="submitMsg" class="muted"></p>
+</section>
+
+<section class="panel">
+<h2>System status</h2>
+<div id="status" class="muted">Loading...</div>
+</section>
+
+<p class="muted" style="text-align:center">
+BezawadaDeals • Existing database records retained
+</p>
+
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({
+"&":"&amp;",
+"<":"&lt;",
+">":"&gt;",
+'"':"&quot;",
+"'":"&#39;"
+}[c]));
+
+async function api(url,opt={}) {
+    const r = await fetch(url,{
+        cache:"no-store",
+        ...opt
+    });
+
+    const d = await r.json().catch(() => ({
+        detail:r.statusText
+    }));
+
+    if(!r.ok) {
+        throw Error(d.detail || r.statusText);
+    }
+
+    return d;
+}
+
+function fail(id,e) {
+    $(id).innerHTML =
+        '<div class="empty">Load error: ' +
+        esc(e.message) +
+        '</div>';
+}
+
+let categories = [];
+let wards = [];
+let localities = [];
+
+async function init() {
+    try {
+        const [c,w,l] = await Promise.all([
+            api("/api/categories"),
+            api("/api/wards"),
+            api("/api/localities")
+        ]);
+
+        categories = c.categories || [];
+        wards = w.wards || [];
+        localities = l.localities || [];
+
+        $("catCount").textContent = categories.length;
+        $("wardCount").textContent = wards.length;
+
+        categories.forEach(x => {
+            $("category").add(new Option(x,x));
+            $("shopCategory").add(new Option(x,x));
+        });
+
+        wards.forEach(x => {
+            $("ward").add(new Option(
+                "Ward " + x.ward_number + " — " + x.ward_name,
+                x.ward_number
+            ));
+        });
+
+        localities.forEach(x => {
+            $("area").add(new Option(
+                x.name + " — Ward " + (x.ward_number ?? "—"),
+                x.name
+            ));
+        });
+
+        $("wardResults").innerHTML = wards.map(x => `
+            <div class="item">
+                <b>
+                    Ward ${esc(x.ward_number)} — ${esc(x.ward_name)}
+                </b>
+                <div class="detail muted">
+                    ${esc(x.area_name || "Area not recorded")}<br>
+                    N: ${esc(x.north_boundary || "Not recorded")}
+                    | E: ${esc(x.east_boundary || "Not recorded")}<br>
+                    S: ${esc(x.south_boundary || "Not recorded")}
+                    | W: ${esc(x.west_boundary || "Not recorded")}<br>
+                    Source: ${esc(x.boundary_source || "Not entered")}
+                </div>
+            </div>
+        `).join("") || "No wards found";
+
+    } catch(e) {
+        fail("wardResults",e);
+    }
+
+    await loadAll();
+}
+
+function params() {
+    const p = new URLSearchParams();
+
+    const fields = [
+        ["category","category"],
+        ["ward_number","ward"],
+        ["area","area"],
+        ["product","product"],
+        ["source_type","source"],
+        ["sort","sort"],
+        ["include_expired","expiry"]
+    ];
+
+    for(const [key,id] of fields) {
+        if($(id).value) {
+            p.set(key,$(id).value);
+        }
+    }
+
+    return p.toString();
+}
+
+async function retail() {
+    try {
+        const d = await api(
+            "/api/unified-price-tracker?" + params()
+        );
+
+        $("priceCount").textContent = d.count;
+
+        $("retailResults").innerHTML = d.count
+            ? d.prices.map(x => `
+                <div class="item">
+                    <div>
+                        <b>${esc(x.product)}</b>
+                        <div class="muted">
+                            ${esc(x.product_category)} • ${esc(x.unit)}
+                        </div>
+                    </div>
+
+                    <div class="detail">
+                        <b>${esc(x.shop)}</b>
+                        <div class="muted">
+                            ${esc(x.shop_type)} • ${esc(x.area)}
+                            • Ward ${esc(x.ward_number)}
+                        </div>
+                        <div class="muted">
+                            ${esc(x.source)} •
+                            ${x.observed_at
+                                ? new Date(x.observed_at).toLocaleString()
+                                : ""}
+                        </div>
+                    </div>
+
+                    <div class="price">
+                        ₹${Number(x.price).toFixed(2)}
+                        <div>
+                            <span class="pill">${esc(x.status)}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join("")
+            : "<div class='empty'>ఈ filterకి ప్రస్తుతం approved shop prices లేవు.</div>";
+
+    } catch(e) {
+        fail("retailResults",e);
+    }
+}
+
+async function govt() {
+    try {
+        const d = await api("/api/official-retail-prices");
+
+        $("govtResults").innerHTML = d.count
+            ? d.prices.map(x => `
+                <div class="item">
+                    <b>
+                        ${esc(x.commodity)}
+                        <div class="muted">${esc(x.unit)}</div>
+                    </b>
+
+                    <div class="detail muted">
+                        ${esc(x.geographic_scope)}
+                        • ${esc(x.report_date || "")}
+                    </div>
+
+                    <div class="price">
+                        ₹${Number(x.price).toFixed(2)}
+                    </div>
+                </div>
+            `).join("")
+            : "<div class='empty'>Government benchmark data not synced.</div>";
+
+    } catch(e) {
+        fail("govtResults",e);
+    }
+}
+
+async function mandi() {
+    try {
+        const d = await api("/api/market-prices");
+
+        $("mandiResults").innerHTML = d.count
+            ? d.prices.map(x => `
+                <div class="item">
+                    <b>
+                        ${esc(x.commodity)}
+                        <div class="muted">
+                            ${esc(x.variety || "")}
+                            • ${esc(x.grade || "")}
+                        </div>
+                    </b>
+
+                    <div class="detail muted">
+                        ${esc(x.market)}
+                        • ${esc(x.district)}
+                        • ${esc(x.arrival_date || "")}
+                    </div>
+
+                    <div class="price">
+                        ₹${x.modal_price ?? "—"}
+                        <div class="muted">per quintal</div>
+                    </div>
+                </div>
+            `).join("")
+            : "<div class='empty'>Mandi data not synced.</div>";
+
+    } catch(e) {
+        fail("mandiResults",e);
+    }
+}
+
+async function shops() {
+    try {
+        const d = await api("/api/shops");
+
+        $("shopResults").innerHTML = d.count
+            ? d.shops.map(x => `
+                <div class="item">
+                    <b>
+                        ${esc(x.name)}
+                        <div class="muted">${esc(x.category)}</div>
+                    </b>
+
+                    <div class="detail muted">
+                        ${esc(x.area)}
+                        • Ward ${esc(x.ward_number)}<br>
+                        ${esc(x.address)}
+                    </div>
+
+                    <div class="muted">
+                        ${esc(x.phone || "")}<br>
+                        ${x.is_verified ? "Verified" : "Unverified"}
+                    </div>
+                </div>
+            `).join("")
+            : "<div class='empty'>No shops registered yet.</div>";
+
+    } catch(e) {
+        fail("shopResults",e);
+    }
+}
+
+async function offers() {
+    try {
+        const d = await api("/api/offers");
+
+        $("offerResults").innerHTML = d.count
+            ? d.offers.map(x => `
+                <div class="item">
+                    <b>
+                        ${esc(x.title)}
+                        <div class="muted">
+                            ${esc(x.description || "")}
+                            ${esc(x.discount_text || "")}
+                        </div>
+                    </b>
+
+                    <div class="detail muted">
+                        ${esc(x.shop)}
+                        • ${esc(x.area)}
+                        • Ward ${esc(x.ward_number)}
+                    </div>
+
+                    <div class="muted">
+                        ${x.valid_until
+                            ? "Until " + new Date(x.valid_until).toLocaleString()
+                            : "No expiry"}
+                    </div>
+                </div>
+            `).join("")
+            : "<div class='empty'>No active offers.</div>";
+
+    } catch(e) {
+        fail("offerResults",e);
+    }
+}
+
+async function status() {
+    try {
+        const [s,src] = await Promise.all([
+            api("/api/status"),
+            api("/api/official-sources")
+        ]);
+
+        $("status").innerHTML =
+            "<b>Database:</b> " +
+            Object.entries(s.counts || {})
+                .map(([k,v]) => esc(k) + ": " + v)
+                .join(" • ") +
+
+            src.sources.map(x => `
+                <p>
+                    <b>${esc(x.name)}</b> —
+                    ${esc(x.note)}<br>
+                    Automatic:
+                    ${x.automatic ? "Configured" : "Not configured"}
+                </p>
+            `).join("") +
+
+            (s.sources || []).map(x => `
+                <p>
+                    ${esc(x.source_key)}:
+                    ${esc(x.status)} •
+                    ${esc(x.last_success || "Never")}
+                </p>
+            `).join("");
+
+    } catch(e) {
+        fail("status",e);
+    }
+}
+
+async function loadAll() {
+    await Promise.all([
+        retail(),
+        govt(),
+        mandi(),
+        shops(),
+        offers(),
+        status()
+    ]);
+
+    $("lastRefresh").textContent =
+        new Date().toLocaleTimeString();
+}
+
+async function submit() {
+    const m = $("submitMsg");
+    m.textContent = "Submitting...";
+
+    const body = {
+        shop_name:$("shopName").value.trim(),
+        shop_type:$("shopType").value.trim(),
+        area:$("shopArea").value.trim(),
+        ward_number:Number($("shopWard").value),
+        product:$("shopProduct").value.trim(),
+        category:$("shopCategory").value,
+        unit:$("shopUnit").value.trim(),
+        price:Number($("shopPrice").value),
+        address:$("shopAddress").value.trim(),
+        phone:$("shopPhone").value.trim(),
+        confirmed:$("confirmed").checked
+    };
+
+    try {
+        const d = await api(
+            "/api/shop/price-update",
+            {
+                method:"POST",
+                headers:{
+                    "Content-Type":"application/json",
+                    "X-Shop-Token":$("ownerToken").value
+                },
+                body:JSON.stringify(body)
+            }
+        );
+
+        m.textContent = d.message;
+
+    } catch(e) {
+        m.textContent = "Error: " + e.message;
+    }
+}
+
+$("refresh").onclick = loadAll;
+$("submitPrice").onclick = submit;
+
+["category","ward","area","sort","expiry"].forEach(id => {
+    $(id).onchange = retail;
+});
+
+let searchTimer;
+
+["product","source"].forEach(id => {
+    $(id).oninput = () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(retail,300);
+    };
+});
+
+init();
+
+setInterval(loadAll,300000);
+</script>
+
+</body>
+</html>
